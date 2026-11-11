@@ -200,6 +200,8 @@ export async function run() {
     jobs: jobs.length, newSinceLastRun: PREV_URL && Object.keys(seenPrev).length ? newCount : null, closedSinceLastRun: Object.keys(seenPrev).length ? closed : null,
     withPay: jobs.filter(j => j.p).length, withYears: jobs.filter(j => j.y).length, withSkills: jobs.filter(j => j.sk).length,
     withOccupation: jobs.filter(j => j.oc != null).length, ghostSomeSigns: jobs.filter(j => j.g === 1).length, ghostLikely: jobs.filter(j => j.g === 2).length, companies: companies.size, excludedRetailAndFastFood: excluded,
+    ghostReasons: jobs.filter(j => j.g).reduce((m, j) => { for (const r of j.gr.split(",")) { const k = r.replace(/^rp\d+$/, "rp"); m[k] = (m[k] || 0) + 1; } return m; }, {}),
+    topSkills: Object.fromEntries(Object.entries(jobs.reduce((m, j) => { for (const k of (j.sk || "").split(",").filter(Boolean)) m[k] = (m[k] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 25)),
     bySource: jobs.reduce((m, j) => (m[j.s] = (m[j.s] || 0) + 1, m), {}),
     cities: Object.fromEntries(Object.entries(buckets).map(([k, v]) => [k, { name: CITIES[k]?.name || "Remote", jobs: v.length }]).sort((a, b) => b[1].jobs - a[1].jobs)),
   };

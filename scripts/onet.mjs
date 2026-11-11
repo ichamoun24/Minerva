@@ -82,8 +82,12 @@ export async function build(dir, version = "") {
   const jz = await table(files, /^job zones\.txt$/i);
   if (jz) { const c = col(jz, /soc code/i), z = col(jz, /job zone/i); for (const r of jz.rows) if (idx.has(r[c])) occ[idx.get(r[c])].zone = +r[z] || 0; }
 
-  const ete = await table(files, /^education, training,? and experience\.txt$/i);
-  if (ete) {
+  // Education and experience: newer releases split this file, so read every table that has RL/RW scale rows.
+  console.log("  files: " + files.map(f => path.basename(f)).filter(n => /educ|train|experience|zone|technology/i.test(n)).join(" | "));
+  const eteFiles = files.filter(f => /educ|train|experience/i.test(path.basename(f)) && !/categor/i.test(path.basename(f)));
+  for (const f of eteFiles) {
+    const ete = await table([f], /./);
+    if (col(ete, /scale id/i) < 0 || col(ete, /^category$/i) < 0) continue;
     const c = col(ete, /soc code/i), s = col(ete, /scale id/i), k = col(ete, /^category$/i), v = col(ete, /data value/i), sup = col(ete, /recommend suppress/i);
     for (const r of ete.rows) {
       const o = occ[idx.get(r[c])]; if (!o) continue;
@@ -92,6 +96,7 @@ export async function build(dir, version = "") {
       if (r[s] === "RL" && RL_TO_DEG[cat] != null) { o.edu = o.edu || [0, 0, 0, 0, 0, 0]; o.edu[RL_TO_DEG[cat]] += val; }
       if (r[s] === "RW" && RW_TO_BAND[cat] != null) { o.exp = o.exp || [0, 0, 0, 0, 0, 0, 0]; o.exp[RW_TO_BAND[cat]] += val; }
     }
+    console.log(`  ${ete.file}: education/experience rows read`);
   }
 
   const tech = await table(files, /^technology skills\.txt$/i);

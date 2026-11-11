@@ -296,6 +296,21 @@ textarea{min-height:110px;resize:vertical;font-size:13px}
 .dist .bar i{display:block;height:100%;background:var(--accent)}
 .dist .row.you{font-weight:700}
 .dist .row.you .bar i{background:var(--hot)}
+.mmenu{display:none}
+.tmore{display:contents}
+@media (max-width:640px){
+ .top{gap:8px;padding:8px 12px}
+ .top #city{flex:1;min-width:0;max-width:none!important}
+ .top .search{order:5;flex:1 1 100%;max-width:none}
+ .top .spacer{display:none}
+ .mmenu{display:inline-flex;align-items:center;gap:6px}
+ .tmore{display:none;order:6;flex:1 1 100%;flex-wrap:wrap;gap:8px}
+ .top.open .tmore{display:flex}
+ .fbar{gap:6px;padding:8px 12px}
+ .fbar .fbtn{padding:5px 9px;font-size:12.5px}
+ .fbar .count{display:none}
+ .dist .row{grid-template-columns:110px 1fr 38px}
+}
 </style>
 </head>
 <body>
@@ -871,12 +886,17 @@ function renderTop(p,city){
     <select class="prof" id="city" aria-label="City" style="max-width:220px">${CITY_LIST.map(([k,n])=>{ const c=STATS&&STATS.cities&&STATS.cities[k]; return `<option value="${k}" ${k===city?"selected":""}>${esc(n)}${c?` · ${c.jobs.toLocaleString()} jobs`:""}</option>`; }).join("")}</select>
     <div class="search"><input id="q" type="search" placeholder="Search company, role or keyword" aria-label="Search listings" value="${esc(UI.F.q)}"></div>
     <div class="spacer"></div>
+    <button class="tbtn mmenu" id="mmenu" aria-expanded="${!!UI.topOpen}" aria-controls="tmore">${UI.topOpen?"Close":"Menu"}${savedN?` <span class="n">${savedN}</span>`:""}</button>
+    <div class="tmore" id="tmore">
     <select class="prof" id="prof" aria-label="Search profile" style="max-width:190px">${DB.profiles.map(x=>`<option value="${x.id}" ${x.id===p.id?"selected":""}>${esc(x.name||"My profile")}</option>`).join("")}<option value="__new">+ New search profile</option></select>
     <button class="tbtn" id="editp">Preferences</button>
     <button class="tbtn" id="savedb" aria-pressed="${UI.F.saved}">${UI.F.saved?"All listings":"Saved"} <span class="n">${savedN}</span></button>
     <button class="tbtn" id="appsb">Applications <span class="n" style="background:var(--accent)">${Object.keys(p.apps||{}).length}</span></button>
     <button class="tbtn" id="aib" title="Interview prep and practice use Claude">${AI.ok()?"Claude ✓":"Connect Claude"}</button>
-    <button class="tbtn primary" id="refresh" aria-label="Check for new jobs" title="Check for new jobs" ${f.state==="loading"?"disabled":""}>${f.state==="loading"?"…":"↻"}</button>`;
+    <button class="tbtn primary" id="refresh" aria-label="Check for new jobs" title="Check for new jobs" ${f.state==="loading"?"disabled":""}>${f.state==="loading"?"…":"↻"}</button>
+    </div>`;
+  $("#top").classList.toggle("open",!!UI.topOpen);
+  $("#mmenu").onclick=()=>{ UI.topOpen=!UI.topOpen; renderTop(p,city); };
   $("#city").onchange=e=>{ p.city=e.target.value; UI.detail=null; resetFilters(p); MS.vb=null; persist(); renderAll(); };
   const q=$("#q"); q.oninput=e=>{ UI.F.q=e.target.value; UI.limit=60; renderList(p,city); renderMap(p,city); };
   if(act==="q"){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); }
