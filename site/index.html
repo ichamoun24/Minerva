@@ -550,7 +550,7 @@ function orgOf(company,src,web){
   const w=String(web||"").toLowerCase().replace(/\/.*$/,"");
   if(/\.(gov|mil)$|\.gov\.[a-z]{2}$|\.nyc$/.test(w)) return "public";
   if(/\.edu$|\.k12\.[a-z]{2}\.us$/.test(w)) return "education";
-  if(/\.org$/.test(w)) return ORG_NAME_EDU.test(company)?"education":"nonprofit";
+  if(/\.org$/.test(w)) return ORG_NAME_EDU.test(company)?"education":ORG_COMPANY.test(company)&&!ORG_NAME_NONPROFIT.test(company)?"company":"nonprofit";
   if(w) return "company";
   if(ORG_COMPANY.test(company)) return "company";
   if(ORG_NAME_EDU.test(company)) return "education";
