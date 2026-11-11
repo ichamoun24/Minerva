@@ -835,8 +835,10 @@ function renderBaseline(j,p){
   loadOnet().then(d=>{
     const b=$("#baseline"); if(!b||UI.detail!==key) return;
     const o=d&&d.occ[j.occ]; if(!o){ b.remove(); return; }
-    const [code,title,zone,edu,exp,tech]=o, parts=[];
+    const [code,title,zone,edu,exp,tech,borrowed]=o, parts=[];
     parts.push(`<p>Closest occupation: <b>${esc(title)}</b> <span class="est">(O*NET ${esc(code)}, matched from the job title${zone?`; ${ZONE[zone].toLowerCase()}`:""})</span></p>`);
+    if(borrowed&&(edu||exp)) parts.push(`<p class="note">O*NET hasn't surveyed this occupation yet, so the figures below are for the closest surveyed one in the same family: <b>${esc(borrowed)}</b>.</p>`);
+    if(!edu&&!exp&&!(tech&&tech.length)){ parts.push(`<p class="note">O*NET has no survey data for this occupation yet.</p>`); }
     if(edu){ const tot=edu.reduce((a,c)=>a+c,0)||1, mine=p.degree||0, ok=Math.round(100*edu.slice(0,mine+1).reduce((a,c)=>a+c,0)/tot);
       parts.push(`<p><b>Education people in this job say it takes</b>${p.degree?` · ${ok}% say no more than your ${esc(DEG_LABEL[mine].toLowerCase())}`:""}</p>${distHTML(DEG_LABEL.map((l,i)=>i?l:"Less than high school"),edu,p.degree||-1)}`); }
     if(exp){ const tot=exp.reduce((a,c)=>a+c,0)||1, band=yearsBand(myYears(p)), ok=Math.round(100*exp.slice(0,band+1).reduce((a,c)=>a+c,0)/tot);

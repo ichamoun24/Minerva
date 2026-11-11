@@ -28,3 +28,8 @@ assert.equal(name("Staff Backend Engineer, Payments"), "Software Developers");
 assert.equal(name("Ceramic Artist / Studio Technician"), "Craft Artists");
 assert.equal(name("Chief of Staff"), null, "no loose single-word matches");
 console.log("✓ job titles matched to occupations");
+const sw = out.occ.find(o => o[0] === "15-1252.00");
+assert.equal(sw[6], "", "surveyed occupations aren't borrowed");
+const craft = out.occ.find(o => o[0] === "27-1012.00");
+assert.equal(craft[3], null, "nothing in the same family to borrow from");
+console.log("✓ unsurveyed occupations borrow from their family when possible");

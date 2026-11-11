@@ -19,6 +19,7 @@ const OUT = process.env.ONET_OUT || path.join(ROOT, "data");
 const PAGE = "https://www.onetcenter.org/database.html";
 const FALLBACK = "https://www.onetcenter.org/dl_files/database/db_30_3_text.zip";
 const UA = { "user-agent": "MinervaJobFeed/0.1 (+https://github.com)" };
+export const BUILDER = 2;   // bump when the output format or parsing changes, so the next run rebuilds
 
 // O*NET "Required Level of Education" (RL) categories -> Minerva's degree levels (0 none … 5 doctorate/professional)
 const RL_TO_DEG = { 1: 0, 2: 1, 3: 1, 4: 1, 5: 2, 6: 3, 7: 3, 8: 4, 9: 4, 10: 5, 11: 5, 12: 5 };
@@ -101,7 +102,10 @@ export async function build(dir, version = "") {
 
   const tech = await table(files, /^(technology|software|tools).*\.txt$/i);
   if (tech) {
-    const c = col(tech, /soc code/i), e = col(tech, /^example$/i), hot = col(tech, /hot technology/i), dem = col(tech, /in demand/i);
+    console.log(`  ${tech.file} columns: ${tech.head.join(" | ")}`);
+    const c = col(tech, /soc code/i), hot = col(tech, /hot/i), dem = col(tech, /in demand/i);
+    let e = col(tech, /^example$/i);
+    if (e < 0) e = tech.head.findIndex(h => /example|software|skill|technology|tool|name/i.test(h) && !/code|commodity|hot|demand|^title$|soc/i.test(h));
     const pick = new Map();
     for (const r of tech.rows) {
       const i = idx.get(r[c]); if (i == null || !r[e]) continue;
@@ -111,9 +115,18 @@ export async function build(dir, version = "") {
     for (const [i, list] of pick) occ[i].tech = [...new Set(list.sort((a, b) => b[0] - a[0]).map(x => x[1]))].slice(0, 8);
   }
 
+  // Some occupations haven't been surveyed yet. Borrow from the closest surveyed one in the same family
+  // (same first 6, then 4 characters of the code) and say so.
+  for (const o of occ) {
+    if (o.edu || o.exp) continue;
+    for (const n of [7, 6, 4]) {
+      const near = occ.find(x => x !== o && (x.edu || x.exp) && x.code.slice(0, n) === o.code.slice(0, n) && !x.borrowed);
+      if (near) { o.edu = near.edu; o.exp = near.exp; if (!o.zone) o.zone = near.zone; if (!o.tech.length) o.tech = near.tech; o.borrowed = near.title; break; }
+    }
+  }
   const round = a => a && a.map(x => Math.round(x));
-  const out = { version, source: "O*NET " + (version || "database") + ", U.S. Department of Labor/Employment and Training Administration (CC BY 4.0)", expBands: EXP_BANDS,
-    occ: occ.map(o => [o.code, o.title, o.zone, round(o.edu), round(o.exp), o.tech]) };
+  const out = { builder: BUILDER, builtAt: new Date().toISOString(), version, source: "O*NET " + (version || "database") + ", U.S. Department of Labor/Employment and Training Administration (CC BY 4.0)", expBands: EXP_BANDS,
+    occ: occ.map(o => [o.code, o.title, o.zone, round(o.edu), round(o.exp), o.tech, o.borrowed || ""]) };
   await fs.mkdir(OUT, { recursive: true });
   await fs.writeFile(path.join(OUT, "onet.json"), JSON.stringify(out));
   await fs.writeFile(path.join(OUT, "onet-titles.json"), JSON.stringify(titles));
@@ -122,6 +135,12 @@ export async function build(dir, version = "") {
 }
 
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) {
+  if (process.env.ONET_IF_STALE === "1") {
+    try {
+      const cur = JSON.parse(await fs.readFile(path.join(OUT, "onet.json"), "utf8"));
+      if (cur.builder === BUILDER && Date.now() - Date.parse(cur.builtAt) < 30 * 864e5) { console.log(`Baseline is current (O*NET ${cur.version}, built ${cur.builtAt.slice(0, 10)}).`); process.exit(0); }
+    } catch {}
+  }
   if (process.env.ONET_DIR) await build(process.env.ONET_DIR, process.env.ONET_VERSION || "");
   else { const { dir, version } = await download(); await build(dir, version); }
 }

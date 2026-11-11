@@ -51,12 +51,9 @@ jobs:
           fi
 
       - name: Build the hiring baseline (O*NET, refreshed monthly)
-        run: |
-          if [ ! -f data/onet.json ] || [ "${{ inputs.discover }}" = "true" ] || [ "$(date -u +%d%H)" = "0100" ]; then
-            node scripts/onet.mjs || echo "Couldn't refresh O*NET this run; keeping the previous baseline."
-          else
-            echo "Baseline is current (refreshed on the 1st of each month)."
-          fi
+        env:
+          ONET_IF_STALE: ${{ inputs.discover == true && 'no' || '1' }}
+        run: node scripts/onet.mjs || echo "Couldn't refresh O*NET this run; keeping the previous baseline."
 
       - name: Read every job
         env:
