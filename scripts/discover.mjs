@@ -1,9 +1,10 @@
-// Finds company job boards hosted on Greenhouse, Lever and Ashby.
+// Finds company job boards hosted on Greenhouse, Lever, Ashby and Workday.
 // Sources: seeds/boards.txt (hand-picked), data/boards.json (previous runs),
 // and the public Common Crawl URL index, which lists career-page URLs it has seen.
 // Output: data/boards.json  { greenhouse: [...], lever: [...], ashby: [...], updatedAt }
 import fs from "node:fs/promises";
 import path from "node:path";
+import { boardFromUrl } from "./workday.mjs";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const OUT = path.join(ROOT, "data", "boards.json");
@@ -15,6 +16,7 @@ const START = Date.now();
 const outOfTime = () => Date.now() - START > BUDGET_MS;
 
 const PATTERNS = [
+  { ats: "workday", url: "*.myworkdayjobs.com", noWayback: true },   // every employer has its own subdomain
   { ats: "greenhouse", url: "boards.greenhouse.io/*" },
   { ats: "greenhouse", url: "job-boards.greenhouse.io/*" },
   { ats: "lever", url: "jobs.lever.co/*" },
@@ -23,6 +25,7 @@ const PATTERNS = [
 const RESERVED = new Set(["embed", "v1", "api", "static", "assets", "favicon.ico", "robots.txt", "sitemap.xml", "jobs", "job_app", "boards", "search", "_next", "cdn-cgi"]);
 
 export function slugFromUrl(ats, raw) {
+  if (ats === "workday") return boardFromUrl(raw);
   let u;
   try { u = new URL(raw.startsWith("http") ? raw : "https://" + raw); } catch { return null; }
   if (ats === "greenhouse") {
@@ -71,7 +74,7 @@ function reportProblems() {
 const WB_LIMIT = Number(process.env.WB_LIMIT || 25000);
 async function fromWayback(found) {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789".split("");
-  for (const p of PATTERNS) {
+  for (const p of PATTERNS.filter(p => !p.noWayback)) {
     const host = p.url.replace("/*", "");
     let added = 0, empty = 0, streak = 0, asked = 0;
     for (const ch of chars) {
@@ -135,10 +138,12 @@ async function save(found) {
 }
 
 export async function loadSeeds() {
-  const found = { greenhouse: new Set(), lever: new Set(), ashby: new Set() };
+  const found = { greenhouse: new Set(), lever: new Set(), ashby: new Set(), workday: new Set() };
   try {
     const txt = await fs.readFile(path.join(ROOT, "seeds", "boards.txt"), "utf8");
     for (const line of txt.split("\n")) {
+      const w = line.trim().match(/^workday:(\S+)/i);
+      if (w) { const b = w[1].includes("|") ? w[1] : boardFromUrl(w[1]); if (b) found.workday.add(b); continue; }
       const m = line.trim().match(/^(greenhouse|lever|ashby):([a-z0-9._-]+)/i);
       if (m) found[m[1].toLowerCase()].add(m[2].toLowerCase());
     }
@@ -163,5 +168,5 @@ if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1])))
   const after = Object.values(found).reduce((n, x) => n + x.size, 0);
   console.log(`New boards found this run: ${after - before}`);
   const out = await save(found);
-  console.log(`Boards: greenhouse ${out.greenhouse.length}, lever ${out.lever.length}, ashby ${out.ashby.length}`);
+  console.log(`Boards: greenhouse ${out.greenhouse.length}, lever ${out.lever.length}, ashby ${out.ashby.length}, workday ${out.workday.length}`);
 }

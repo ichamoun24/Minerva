@@ -1,0 +1,8 @@
+O*NET-SOC Code	Title	Alternate Title	Short Title	Source(s)
+13-2051.00	Financial and Investment Analysts	Investment Banking Analyst		08
+13-2051.00	Financial and Investment Analysts	Financial Analyst		08
+41-4012.00	Sales Representatives	Account Executive		08
+15-1252.00	Software Developers	Software Engineer		08
+15-1252.00	Software Developers	Backend Engineer		08
+27-1012.00	Craft Artists	Potter		08
+27-1012.00	Craft Artists	Ceramic Artist		08

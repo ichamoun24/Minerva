@@ -4,10 +4,10 @@
 //   workable  Workable's public cross-company job search (jobs.workable.com), searched by city
 //   nycgov    New York City government postings (NYC Open Data, updated daily)
 //   usajobs   Federal jobs (needs a free key: set USAJOBS_KEY and USAJOBS_EMAIL as repo secrets)
-import { reqYearsOf } from "./years.mjs";
+import { info } from "./describe.mjs";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const yrs = (...parts) => { const n = reqYearsOf(parts.filter(Boolean).join("\n")); return n ? { y: n } : {}; };
-const yrsMin = (...parts) => { const n = reqYearsOf(parts.filter(Boolean).join("\n"), "min"); return n ? { y: n } : {}; };
+const yrs = (...parts) => info(parts);
+const yrsMin = (...parts) => info(parts, "min");
 
 const WORKABLE_CITIES = { nyc: "New York", sf: "San Francisco", boston: "Boston", seattle: "Seattle", austin: "Austin", la: "Los Angeles", chicago: "Chicago", dc: "Washington", denver: "Denver", miami: "Miami" };
 const WK_MAX_PAGES = Number(process.env.WK_MAX_PAGES || 400);   // 20 jobs a page

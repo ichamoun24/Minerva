@@ -50,6 +50,14 @@ jobs:
             echo "Skipping discovery this run (it runs weekly on Mondays)."
           fi
 
+      - name: Build the hiring baseline (O*NET, refreshed monthly)
+        run: |
+          if [ ! -f data/onet.json ] || [ "${{ inputs.discover }}" = "true" ] || [ "$(date -u +%d%H)" = "0100" ]; then
+            node scripts/onet.mjs || echo "Couldn't refresh O*NET this run; keeping the previous baseline."
+          else
+            echo "Baseline is current (refreshed on the 1st of each month)."
+          fi
+
       - name: Read every job
         env:
           PREV_URL: ${{ steps.pages.outputs.base_url }}
@@ -59,12 +67,12 @@ jobs:
           USAJOBS_EMAIL: ${{ secrets.USAJOBS_EMAIL }}
         run: node scripts/fetch.mjs
 
-      - name: Save the board list
+      - name: Save the board list and baseline
         run: |
           git config user.name "jobs-bot"
           git config user.email "jobs-bot@users.noreply.github.com"
-          git add data/boards.json
-          git diff --cached --quiet || (git commit -m "Update job board list [skip ci]" && git push) || true
+          git add data/boards.json data/onet.json data/onet-titles.json 2>/dev/null || git add data/boards.json
+          git diff --cached --quiet || (git commit -m "Update job board list and hiring baseline [skip ci]" && git push) || true
 
       - uses: actions/upload-pages-artifact@v3
         with:

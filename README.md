@@ -1,6 +1,6 @@
 # Minerva Job Feed
 
-A free "server" that collects every open job from company career boards hosted on **Greenhouse, Lever and Ashby**, every six hours, and publishes them as a searchable website plus JSON files your app can read.
+A free "server" that collects every open job from company career boards hosted on **Greenhouse, Lever, Ashby and Workday**, every six hours, and publishes them as a searchable website plus JSON files your app can read.
 
 It runs entirely on GitHub's free tools:
 
@@ -13,6 +13,7 @@ No credit card, no API keys, nothing to install on your computer.
 
 Besides company boards on Greenhouse, Lever and Ashby, each run also reads (see `scripts/sources.mjs`):
 
+- **Workday career sites** (`scripts/workday.mjs`), used by most large banks, insurers, hospitals, universities and Fortune 500 companies. Each employer's site is listed in `data/boards.json` as `tenant|wdN|site`; discovery finds them in Common Crawl and you can add one to `seeds/boards.txt` as `workday:https://acme.wd5.myworkdayjobs.com/Careers`. Only postings in Minerva's cities (or remote) are read in full. `WD_MINUTES` (default 45) caps the time spent.
 - **Workable's public job search** (jobs.workable.com), city by city. This is where many schools, clinics, nonprofits, studios and small businesses post.
 - **New York City government jobs** from NYC Open Data (updated daily).
 - **Federal jobs from USAJOBS**, if you add two repository secrets: `USAJOBS_KEY` (free, from developer.usajobs.gov) and `USAJOBS_EMAIL` (the email you registered with). Settings → Secrets and variables → Actions.
@@ -31,6 +32,27 @@ Fast-food and retail store jobs (cashier, barista, line cook, store associate an
 
 `site/feed.html` is the plain feed browser.
 
+## What it reads from each posting
+
+`scripts/describe.mjs` reads every job description once, in the collector, and keeps short fields the website compares with the visitor's resume:
+
+- years of experience required (`y`), required skills (`sk`, from about 130 skills in `scripts/skills.mjs` covering office, finance, sales, engineering, design, healthcare, education, nonprofit, arts and trades work), licenses (`lc`: CPA, Series 7, RN and so on), degree level (`ed`, negative when "or equivalent experience" is accepted), visa sponsorship (`ns` won't sponsor, `sp` will), office days a week (`od`), travel % (`tv`) and security clearance (`cl`). Anything listed only as "preferred" or "nice to have" is left out.
+
+## Ghost-job scan
+
+`scripts/ghost.mjs` flags postings that are unlikely to lead to a hire right now. No single signal proves it, so each adds to a score and is shown as a reason (`g` 1 = some signs, 2 = likely ghost; `gr` = reasons):
+
+- talent-pool, pipeline or "future openings" language, or a general-application title
+- open 60+ or 120+ days (government postings are exempt; many stay open by law)
+- the same company, title and city reposted under new ids (tracked across runs in `history.json`)
+- 15+ open listings with the exact same title
+
+The website ranks these lower and hides the likely ones unless the visitor chooses to see them.
+
+## Hiring baseline (O*NET)
+
+There is no public dataset of who was hired or turned down for specific jobs. The closest public baseline is O*NET (U.S. Department of Labor, CC BY 4.0), which surveys people working in each occupation. `scripts/onet.mjs` downloads it monthly and keeps, for about 1,000 occupations, the education people in the job say it requires, the related experience it takes before starting, the Job Zone and the tools most named. `fetch.mjs` tags each posting with its closest occupation (`oc`) from O*NET's ~60,000 job titles, and the website shows the visitor where they sit on each distribution.
+
 ## How it finds "every" job
 
 These platforms don't publish one master list. Each company has its own public board. So the collector:
@@ -39,7 +61,7 @@ These platforms don't publish one master list. Each company has its own public b
 2. **Discovers thousands more** each week from the public Common Crawl index, which records career-page URLs found across the web (`jobs.lever.co/…`, `boards.greenhouse.io/…`, `jobs.ashbyhq.com/…`).
 3. **Reads every board**, keeps open jobs, and drops boards that no longer exist.
 
-Expect thousands of companies and a very large number of jobs after the first full run. That's most venture-backed startups and many tech and consumer companies. It won't include companies that use Workday, iCIMS or their own systems, or jobs posted only on LinkedIn or Indeed.
+Expect thousands of companies and a very large number of jobs after the first full run. It won't include companies that use iCIMS, Taleo, SuccessFactors or their own systems, or jobs posted only on LinkedIn or Indeed.
 
 ## Set it up (about 10 minutes)
 
@@ -70,7 +92,9 @@ Each job looks like this (short keys keep the files small):
  "l":"New York, NY","d":"Sales","p":"$120K–$165K","u":"https://…","o":"2026-11-05","f":"2026-11-10","r":0}
 ```
 
-`i` id · `s` source · `c` company · `t` title · `l` location · `d` team · `p` pay (when listed) · `u` apply link · `o` date posted · `f` date first seen by this feed · `r` remote · `k` job type.
+`i` id · `s` source · `c` company · `t` title · `l` location · `d` team · `p` pay (when listed) · `u` apply link · `o` date posted · `f` date first seen by this feed · `r` remote · `k` job type · `w` employer website · plus the requirement, ghost and occupation fields described above.
+
+Also published: `seen.json` (first-seen dates), `history.json` (role history for the ghost scan) and `onet.json` (the baseline).
 
 ## Settings you can change
 

@@ -4,11 +4,14 @@
 //   site/data/<city>.json           compact job list for each city (and "remote")
 //   site/data/companies.json        company name, ATS, job count
 //   site/data/seen.json             job id -> first-seen date (lets the next run mark New / Closed)
+//   site/data/history.json          role history for the ghost-job scan (reposts, time open)
 import fs from "node:fs/promises";
 import path from "node:path";
 import { workableJobs, nycGovJobs, usaJobs, isRetailOrFastFood } from "./sources.mjs";
-import { reqYearsOf } from "./years.mjs";
-const yrs = (...parts) => { const n = reqYearsOf(parts.filter(Boolean).join("\n")); return n ? { y: n } : {}; };
+import { info } from "./describe.mjs";
+import { scan } from "./ghost.mjs";
+import { buildIndex, matcher } from "./occmatch.mjs";
+const yrs = (...parts) => info(parts);
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const BOARDS = path.join(ROOT, "data", "boards.json");
@@ -19,19 +22,9 @@ const LIMIT = Number(process.env.BOARD_LIMIT || 0);          // 0 = every board
 const PREV_URL = process.env.PREV_URL || "";                 // live site, to carry first-seen dates
 const FIXTURES = process.env.FIXTURES || "";                 // offline test mode
 
-export const CITIES = {
-  nyc: { name: "New York", re: /\b(new york|nyc|manhattan|brooklyn|queens|bronx|staten island|long island city|jersey city|hoboken)\b/i },
-  sf: { name: "San Francisco Bay Area", re: /\b(san francisco|sf\b|bay area|oakland|berkeley|emeryville|palo alto|menlo park|mountain view|sunnyvale|san mateo|redwood city|san jose|santa clara|south san francisco|foster city|burlingame)\b/i },
-  boston: { name: "Boston", re: /\b(boston|cambridge, ma|somerville)\b/i },
-  seattle: { name: "Seattle", re: /\b(seattle|bellevue|redmond|kirkland)\b/i },
-  austin: { name: "Austin", re: /\baustin\b/i },
-  la: { name: "Los Angeles", re: /\b(los angeles|santa monica|culver city|venice, ca|playa vista|pasadena|irvine)\b/i },
-  chicago: { name: "Chicago", re: /\bchicago\b/i },
-  dc: { name: "Washington, DC", re: /\b(washington,? d\.?c\.?|arlington, va|bethesda|reston|mclean)\b/i },
-  denver: { name: "Denver / Boulder", re: /\b(denver|boulder)\b/i },
-  miami: { name: "Miami", re: /\b(miami|fort lauderdale)\b/i },
-};
-const REMOTE_RE = /\bremote\b|\banywhere\b|work from home|telecommute/i;
+import { CITIES, REMOTE_RE } from "./cities.mjs";
+import { workdayJobs } from "./workday.mjs";
+export { CITIES };
 const EXTRA = process.env.EXTRA_SOURCES !== "0" && !FIXTURES;   // workable, nycgov, usajobs
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -138,10 +131,14 @@ export async function run() {
   if (LIMIT) list = list.slice(0, LIMIT);
   console.log(`Reading ${list.length} boards with ${CONCURRENCY} at a time…`);
 
-  let seenPrev = {};
-  if (PREV_URL) { const r = await getJSON(PREV_URL.replace(/\/$/, "") + "/data/seen.json"); if (r.ok) seenPrev = r.data; }
+  let seenPrev = {}, histPrev = {};
+  if (PREV_URL) {
+    const base = PREV_URL.replace(/\/$/, "");
+    const r = await getJSON(base + "/data/seen.json"); if (r.ok) seenPrev = r.data;
+    const r2 = await getJSON(base + "/data/history.json"); if (r2.ok) histPrev = r2.data;
+  }
 
-  const t0 = Date.now(); const dead = { greenhouse: [], lever: [], ashby: [] }; let failed = 0, done = 0;
+  const t0 = Date.now(); const dead = { greenhouse: [], lever: [], ashby: [], workday: [] }; let failed = 0, done = 0;
   const results = await pool(list, CONCURRENCY, async b => {
     const r = await readBoard(b.ats, b.slug);
     if (++done % 500 === 0) console.log(`  ${done}/${list.length} boards`);
@@ -152,7 +149,8 @@ export async function run() {
   let extra = [];
   if (EXTRA) {
     console.log("Reading other sources…");
-    const parts = await Promise.all([workableJobs(), nycGovJobs(), usaJobs()].map(p => p.catch(e => { console.log("  source failed: " + e.message); return []; })));
+    const wd = workdayJobs(boards.workday).then(r => { dead.workday.push(...r.dead); return r.jobs; });
+    const parts = await Promise.all([workableJobs(), nycGovJobs(), usaJobs(), wd].map(p => p.catch(e => { console.log("  source failed: " + e.message); return []; })));
     extra = parts.flat();
   }
   const today = new Date().toISOString().slice(0, 10);
@@ -170,6 +168,15 @@ export async function run() {
   const seen = {}; let newCount = 0;
   for (const j of jobs) { j.f = seenPrev[j.i] || today; if (!seenPrev[j.i]) newCount++; seen[j.i] = j.f; }
   const closed = Object.keys(seenPrev).filter(id => !seen[id]).length;
+  const history = scan(jobs, histPrev, today, j => citiesFor(j.l)[0] || "");
+
+  // Tag each job with its O*NET occupation (the hiring baseline), when scripts/onet.mjs has been run.
+  let onet = null;
+  try { onet = await fs.readFile(path.join(ROOT, "data", "onet.json"), "utf8"); } catch {}
+  if (onet) {
+    const occOf = matcher(buildIndex(JSON.parse(await fs.readFile(path.join(ROOT, "data", "onet-titles.json"), "utf8"))));
+    for (const j of jobs) { const o = occOf(j.t); if (o >= 0) j.oc = o; }
+  }
 
   const buckets = {}; const companies = new Map();
   for (const j of jobs) {
@@ -185,11 +192,14 @@ export async function run() {
   }
   await fs.writeFile(path.join(OUTDIR, "companies.json"), JSON.stringify([...companies.values()].sort((a, b) => b.n - a.n)));
   await fs.writeFile(path.join(OUTDIR, "seen.json"), JSON.stringify(seen));
+  await fs.writeFile(path.join(OUTDIR, "history.json"), JSON.stringify(history));
+  if (onet) await fs.writeFile(path.join(OUTDIR, "onet.json"), onet);
   const stats = {
     updatedAt: new Date().toISOString(), seconds: Math.round((Date.now() - t0) / 1000),
     boards: list.length, boardsFailed: failed, boardsGone: Object.values(dead).flat().length,
     jobs: jobs.length, newSinceLastRun: PREV_URL && Object.keys(seenPrev).length ? newCount : null, closedSinceLastRun: Object.keys(seenPrev).length ? closed : null,
-    withPay: jobs.filter(j => j.p).length, companies: companies.size, excludedRetailAndFastFood: excluded,
+    withPay: jobs.filter(j => j.p).length, withYears: jobs.filter(j => j.y).length, withSkills: jobs.filter(j => j.sk).length,
+    withOccupation: jobs.filter(j => j.oc != null).length, ghostSomeSigns: jobs.filter(j => j.g === 1).length, ghostLikely: jobs.filter(j => j.g === 2).length, companies: companies.size, excludedRetailAndFastFood: excluded,
     bySource: jobs.reduce((m, j) => (m[j.s] = (m[j.s] || 0) + 1, m), {}),
     cities: Object.fromEntries(Object.entries(buckets).map(([k, v]) => [k, { name: CITIES[k]?.name || "Remote", jobs: v.length }]).sort((a, b) => b[1].jobs - a[1].jobs)),
   };

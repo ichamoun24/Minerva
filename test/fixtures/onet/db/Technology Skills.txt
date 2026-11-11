@@ -1,0 +1,4 @@
+O*NET-SOC Code	Title	Example	Commodity Code	Commodity Title	Hot Technology	In Demand
+13-2051.00	Financial and Investment Analysts	Microsoft Excel	1	Spreadsheet	Y	Y
+13-2051.00	Financial and Investment Analysts	FactSet	1	Financial	N	N
+13-2051.00	Financial and Investment Analysts	Bloomberg Terminal	1	Financial	Y	N

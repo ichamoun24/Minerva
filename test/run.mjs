@@ -10,6 +10,9 @@ assert.equal(slugFromUrl("greenhouse", "https://boards.greenhouse.io/embed/job_b
 assert.equal(slugFromUrl("greenhouse", "https://job-boards.greenhouse.io/embed/job_app?token=1"), null);
 assert.equal(slugFromUrl("lever", "https://jobs.lever.co/palantir/abc-123"), "palantir");
 assert.equal(slugFromUrl("ashby", "https://jobs.ashbyhq.com/Ramp/xyz"), "ramp");
+assert.equal(slugFromUrl("workday", "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US-CA-Santa-Clara/Engineer_JR1"), "nvidia|wd5|NVIDIAExternalCareerSite");
+assert.equal(slugFromUrl("workday", "https://acme.wd1.myworkdayjobs.com/wday/cxs/acme/Careers/jobs"), "acme|wd1|Careers");
+assert.equal(slugFromUrl("workday", "https://acme.wd1.myworkdayjobs.com/en-US/job/x"), null);
 console.log("✓ board discovery parsing");
 
 // Use a throwaway board list and output folder

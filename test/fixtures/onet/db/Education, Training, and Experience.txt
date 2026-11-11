@@ -1,0 +1,8 @@
+O*NET-SOC Code	Title	Element ID	Element Name	Scale ID	Category	Data Value	N	Standard Error	Lower CI Bound	Upper CI Bound	Recommend Suppress	Date	Domain Source
+13-2051.00	Financial and Investment Analysts	2.D.1	Required Level of Education	RL	2	5.0	30				N	08/2023	Incumbent
+13-2051.00	Financial and Investment Analysts	2.D.1	Required Level of Education	RL	6	70.0	30				N	08/2023	Incumbent
+13-2051.00	Financial and Investment Analysts	2.D.1	Required Level of Education	RL	8	25.0	30				N	08/2023	Incumbent
+13-2051.00	Financial and Investment Analysts	3.A.1	Related Work Experience	RW	1	20.0	30				N	08/2023	Incumbent
+13-2051.00	Financial and Investment Analysts	3.A.1	Related Work Experience	RW	6	30.0	30				N	08/2023	Incumbent
+13-2051.00	Financial and Investment Analysts	3.A.1	Related Work Experience	RW	7	50.0	30				N	08/2023	Incumbent
+13-2051.00	Financial and Investment Analysts	3.A.1	Related Work Experience	RW	11	9.0	30				Y	08/2023	Incumbent

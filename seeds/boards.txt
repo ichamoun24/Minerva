@@ -65,3 +65,12 @@ ashby:concourse
 ashby:lio
 ashby:deel
 ashby:runway
+# Workday career sites (tenant.wdN.myworkdayjobs.com/Site); discovery adds more from Common Crawl
+workday:https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
+workday:https://salesforce.wd12.myworkdayjobs.com/External_Career_Site
+workday:https://adobe.wd5.myworkdayjobs.com/external_experienced
+workday:https://blackrock.wd1.myworkdayjobs.com/BlackRock_Professional
+workday:https://mastercard.wd1.myworkdayjobs.com/CorporateCareers
+workday:https://capitalone.wd12.myworkdayjobs.com/Capital_One
+workday:https://pwc.wd3.myworkdayjobs.com/Global_Experienced_Careers
+workday:https://disney.wd5.myworkdayjobs.com/disneycareer

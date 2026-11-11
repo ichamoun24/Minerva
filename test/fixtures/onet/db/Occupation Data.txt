@@ -1,0 +1,5 @@
+O*NET-SOC Code	Title	Description
+13-2051.00	Financial and Investment Analysts	Conduct quantitative analyses.
+41-4012.00	Sales Representatives, Wholesale and Manufacturing, Except Technical and Scientific Products	Sell goods.
+15-1252.00	Software Developers	Research, design, and develop software.
+27-1012.00	Craft Artists	Create or reproduce handmade objects.
