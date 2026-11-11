@@ -7,6 +7,7 @@
 import { reqYearsOf } from "./years.mjs";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const yrs = (...parts) => { const n = reqYearsOf(parts.filter(Boolean).join("\n")); return n ? { y: n } : {}; };
+const yrsMin = (...parts) => { const n = reqYearsOf(parts.filter(Boolean).join("\n"), "min"); return n ? { y: n } : {}; };
 
 const WORKABLE_CITIES = { nyc: "New York", sf: "San Francisco", boston: "Boston", seattle: "Seattle", austin: "Austin", la: "Los Angeles", chicago: "Chicago", dc: "Washington", denver: "Denver", miami: "Miami" };
 const WK_MAX_PAGES = Number(process.env.WK_MAX_PAGES || 400);   // 20 jobs a page
@@ -66,7 +67,7 @@ export function fromNycGov(r) {
     i: `ny:${r.job_id}`, s: "nycgov", c: smartCase(r.agency), t: smartCase(r.business_title || r.civil_service_title),
     l: [r.work_location, "New York City"].filter(Boolean).join(" · "), d: r.job_category || "",
     p: pay(r.salary_range_from, r.salary_range_to, per), u: `https://cityjobs.nyc.gov/job/${r.job_id}`,
-    o: isoDay(r.posting_date), k: r.full_time_part_time_indicator === "P" ? "Part-time" : r.full_time_part_time_indicator === "F" ? "Full-time" : "", ...yrs(r.minimum_qual_requirements),
+    o: isoDay(r.posting_date), k: r.full_time_part_time_indicator === "P" ? "Part-time" : r.full_time_part_time_indicator === "F" ? "Full-time" : "", ...yrsMin(r.minimum_qual_requirements),
   };
 }
 export async function nycGovJobs(log = console.log) {
@@ -85,7 +86,7 @@ export function fromUsaJobs(m) {
     i: `us:${m.PositionID || m.PositionURI}`, s: "usajobs", c: m.OrganizationName || m.DepartmentName || "", t: m.PositionTitle || "",
     l: m.PositionLocationDisplay || (m.PositionLocation || []).map(x => x.LocationName).join("; "), d: m.DepartmentName || "",
     p: pay(rem.MinimumRange, rem.MaximumRange, per), u: m.PositionURI || "", o: isoDay(m.PublicationStartDate),
-    k: ((m.PositionSchedule || [])[0] || {}).Name || "", ...yrs(m.QualificationSummary),
+    k: ((m.PositionSchedule || [])[0] || {}).Name || "", ...yrsMin(m.QualificationSummary),
   };
 }
 export async function usaJobs(log = console.log) {

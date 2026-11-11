@@ -17,6 +17,7 @@ process.env.FIXTURES = path.join(ROOT, "test", "fixtures");
 await fs.mkdir(path.join(ROOT, "data"), { recursive: true });
 const boardsPath = path.join(ROOT, "data", "boards.json");
 let backup = null; try { backup = await fs.readFile(boardsPath, "utf8"); } catch {}
+try {
 await fs.writeFile(boardsPath, JSON.stringify({ greenhouse: ["stripe", "doesnotexist"], lever: ["palantir"], ashby: ["ramp"] }));
 const { run, citiesFor } = await import("../scripts/fetch.mjs");
 assert.deepEqual(citiesFor("San Francisco, CA; Remote in US"), ["sf", "remote"]);
@@ -35,4 +36,8 @@ const after = JSON.parse(await fs.readFile(boardsPath, "utf8"));
 assert.deepEqual(after.greenhouse, ["stripe"], "missing board dropped");
 assert.deepEqual(after.dead.greenhouse, ["doesnotexist"]);
 console.log("✓ full run on sample data:", stats.jobs, "jobs,", Object.keys(stats.cities).join(", "));
-if (backup) await fs.writeFile(boardsPath, backup); else await fs.rm(boardsPath);
+} finally {
+  // always put the real board list back, even when an assertion above fails
+  if (backup) await fs.writeFile(boardsPath, backup); else await fs.rm(boardsPath, { force: true });
+}
+

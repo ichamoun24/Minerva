@@ -16,6 +16,8 @@ const cases = [
   ["Must be at least 18 years old.", 0],
   ["Nice to have:\n• 8+ years of experience in ceramics\nWhat you'll need:\n• 1+ years of studio experience", 1],
 ];
+const nyc = "1. A baccalaureate degree from an accredited college and two years of full-time satisfactory experience in community work; or 2. A four-year high school diploma and six years of full-time satisfactory experience as described in 1 above.";
+if (reqYearsOf(nyc, "min") !== 2) { console.log("✗ NYC alternatives (min mode) got", reqYearsOf(nyc, "min")); process.exit(1); }
 let fail = 0;
 for (const [t, want] of cases) { const got = reqYearsOf(t); if (got !== want) { fail++; console.log(`✗ got ${got}, want ${want}: ${t.slice(0, 80)}`); } }
 console.log(fail ? `${fail} failed` : `✓ years parser: ${cases.length} cases`);

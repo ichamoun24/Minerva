@@ -134,6 +134,7 @@ export function citiesFor(loc) {
 export async function run() {
   const boards = JSON.parse(await fs.readFile(BOARDS, "utf8"));
   let list = ["greenhouse", "lever", "ashby"].flatMap(ats => (boards[ats] || []).map(slug => ({ ats, slug })));
+  if (!FIXTURES && list.length < 100) throw new Error(`Only ${list.length} boards in data/boards.json; refusing to publish a feed that small. Restore the file from git history.`);
   if (LIMIT) list = list.slice(0, LIMIT);
   console.log(`Reading ${list.length} boards with ${CONCURRENCY} at a time…`);
 

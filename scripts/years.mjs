@@ -36,9 +36,11 @@ function inPreferredSection(t, i) {
   return false;
 }
 
-export function reqYearsOf(raw) {
+// mode "max": the largest required amount (company postings, where several lines add up to one bar).
+// mode "min": the easiest route (government postings list alternatives: "a degree and 2 years, or 6 years").
+export function reqYearsOf(raw, mode = "max") {
   const t = plainText(raw); if (!t) return 0;
-  let best = 0, m;
+  let best = mode === "min" ? Infinity : 0, m;
   RE.lastIndex = 0;
   while ((m = RE.exec(t))) {
     const n = WORDNUM[m[1].toLowerCase()] ?? parseInt(m[1], 10);
@@ -46,7 +48,7 @@ export function reqYearsOf(raw) {
     const before = t.slice(Math.max(0, m.index - 140), m.index).toLowerCase();
     const after = t.slice(m.index + m[0].length, m.index + m[0].length + 90).toLowerCase();
     const near = before.slice(-40) + " " + after.slice(0, 40);
-    if (/^['’]?\s*(old|ago|of age|-?\s*degree|program|college|university|bachelor|undergrad)/.test(after)) continue;
+    if (/^['’]?\s*(old|ago|of age|-?\s*degree|program|college|university|bachelor|undergrad|high school|diploma)/.test(after)) continue;
     if (/^\s*(in business|of history|of operation|of serving|of service to|of growth|running)/.test(after)) continue;
     if (/commit|contract\b|\bterm\b|fellowship|residency program|warranty|lease|vesting|cliff|tenure|anniversary|guarantee/.test(near)) continue;
     if (/\b(we|we've|we have|our (company|firm|team|organization|agency|founders?)|the company|the firm)\s+(have|has|bring|brings|boasts?)\b[^.]{0,25}$|\b(for|with) over\s*$|founded|since\s*$|serving\s*$/.test(before.slice(-70))) continue;
@@ -57,7 +59,7 @@ export function reqYearsOf(raw) {
     const pref = /\b(prefer|preferred|nice to have|bonus|ideally|ideal candidate|a plus|desired|desirable)\b[^\n]{0,100}$/.test(before)
       || /^[^.;\n]{0,70}\b(preferred|is a plus|a plus|nice to have|is a bonus|desired)\b/.test(after);
     if (pref || inPreferredSection(t, m.index)) continue;
-    if (n > best) best = n;
+    if (mode === "min" ? n < best : n > best) best = n;
   }
-  return best;
+  return best === Infinity ? 0 : best;
 }
