@@ -853,7 +853,7 @@ function renderMap(p,city){
   const groups={}; jobs.forEach(j=>{ if(!visibleJob(j,p,true)) return; const k=j.area||"Other"; (groups[k]=groups[k]||[]).push(j); });
   const pl=layer();
   if(home){ const g=document.createElementNS(NS,"g"); g.setAttribute("class","homepin"); g.innerHTML=`<rect x="-17" y="-9" width="34" height="18" rx="4"></rect><text y="0.5">HOME</text>`; pl.appendChild(g); MS.homeG={g,x:home[0],y:home[1]}; } else MS.homeG=null;
-  const setArea=n=>{ UI.F.area=UI.F.area===n?null:n; UI.limit=60; hoverHide(); renderFilters(p,city); renderList(p,city); renderMap(p,city); };
+  const setArea=n=>{ UI.F.area=UI.F.area===n?null:n; UI.limit=60; hoverHide(); renderFilters(p,city); renderList(p,city); renderMap(p,city); $("#listside").scrollTop=0; };
   Object.entries(groups).forEach(([name,list])=>{
     const xy=areaXY(city,name); if(!xy) return;
     const n=list.length, rr=Math.min(28,12+Math.sqrt(n)*2), wide=!G.cent[name];
@@ -884,7 +884,6 @@ function areaHover(pin,city){
   const pt=svg.createSVGPoint(); pt.x=pin.x; pt.y=pin.y; const s=pt.matrixTransform(svg.getScreenCTM()); const br=svg.getBoundingClientRect();
   const sx=s.x-br.left, sy=s.y-br.top; let left=sx-130, top2=sy-hc.offsetHeight-36; if(top2<8) top2=sy+36; left=Math.max(8,Math.min(left,br.width-268));
   hc.style.left=left+"px"; hc.style.top=top2+"px";
-  pin.g.parentNode.appendChild(pin.g);
 }
 function hoverHide(){ $("#hover").classList.remove("show"); }
 function hilite(i){ const j=i!=null&&MEMO?MEMO.jobs[i]:null; MS.pins.forEach(pn=>pn.g.classList.toggle("on",!!j&&pn.area===j.area)); }
