@@ -296,6 +296,12 @@ textarea{min-height:110px;resize:vertical;font-size:13px}
 .dist .bar i{display:block;height:100%;background:var(--accent)}
 .dist .row.you{font-weight:700}
 .dist .row.you .bar i{background:var(--hot)}
+.badge.two{display:inline-flex;align-items:center;gap:5px;font-weight:500}
+.badge.two b{font-weight:800}
+.badge.two i{width:1px;height:11px;background:currentColor;opacity:.35;margin:0 2px}
+.twobig{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
+.apply h4.mh{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:14px 0 4px}
+.note.bad{color:var(--hot)}
 .mmenu{display:none}
 .tmore{display:contents}
 @media (max-width:640px){
@@ -455,25 +461,49 @@ function levelFit(j,p){
   if(j.reqYears){ const y=myYears(p); return j.reqYears>y+0.25?1:(y-j.reqYears<=4?5:3.5); }
   const r=(EXP[p.exp]||EXP.early)[2], L=j.level; if(L>=r[0]&&L<=r[1]) return 5; const d=L<r[0]?r[0]-L:L-r[1]; return d===1?3:d===2?1.5:1; }
 function roleFit(j,p){ if(p.roles&&p.roles.length) return p.roles.includes(j.role)?5:1.5; return (p.inferred||[]).includes(j.role)?4.5:j.role==="other"?2:2.5; }
-function attrs(j,p){
-  const fit=Math.max(1,Math.min(5,j._qs!=null?.35*j._lf+.25*j._rf+.4*j._qs:.5*j._lf+.38*j._rf+.12*(1+4*j._kf)));
-  const pt=j._pay; const pay=pt?(pt>=200?5:pt>=150?4.5:pt>=120?4:pt>=90?3:pt>=60?2:1.5):2.5;
-  let bal=BAL[j.role]||3; if(j.level>=4) bal-=.5; if(j.cat==="small") bal-=.5; if(!j.fulltime) bal+=.5; bal=Math.max(1,Math.min(5,bal));
-  const d=j._dist; const commute=d==null?3:d<1?5:d<2?4:d<3?3:d<5?2:1;
-  const a={fit,balance:bal,pay,people:PEOPLE[j.role]||3,growth:{small:5,growing:4,large:3}[j.cat]||3,brand:{large:5,growing:3.5,small:2}[j.cat]||3,
-    mission:j._mission,commute,flex:j.setup==="Remote"?5:j.setup==="Hybrid"?4:3,equity:j.equity?5:({small:4,growing:3.5,large:2.5}[j.cat]||3)};
-  if(p.cats&&p.cats.length) a.size=p.cats.includes(j.cat)?5:2;
-  return a;
+// Two separate scores, 0–100:
+//   Qualification: do you meet what the job asks for (experience, required skills, licenses, degree, visa, background)?
+//   Interest: is it the kind of job you said you want (role types, ranked priorities, company size, pay floor)?
+const pctOf=parts=>{ let s=0,w=0; parts.forEach(x=>{ s+=x.w*(x.s-1)/4; w+=x.w; }); return w?Math.round(100*s/w):50; };
+function qualOf(j,p){
+  const r=j._req, parts=[], y=myYears(p);
+  if(j.reqYears){ const gap=j.reqYears-y; parts.push({k:"exp",l:"Experience",w:3,s:gap<=0.25?5:gap<=1?3:gap<=2?2:1,src:`asks ${j.reqYears}+ yrs; you have about ${fmtYears(y)}`}); }
+  else parts.push({k:"exp",l:"Experience",w:2,s:levelFit(j,p),src:`no years stated; ${LEVELS[j.level].toLowerCase()} title vs. your experience`});
+  if(r&&r.n) parts.push({k:"skills",l:"Required skills",w:3,s:1+4*r.have.length/r.n,src:`${r.have.length} of ${r.n} on your profile`});
+  else parts.push({k:"skills",l:"Resume overlap",w:1,s:1+4*(j._kf||0),src:"no skills listed; resume words in the title"});
+  if(r&&(r.licHave.length||r.licMiss.length)) parts.push({k:"lic",l:"Licenses",w:3,s:r.licMiss.length?1:5,src:r.licMiss.length?`needs ${r.licMiss.map(id=>LIC[id].label).join(", ")}`:"you have what it asks"});
+  if(j.edu&&p.degree) parts.push({k:"deg",l:"Degree",w:2,s:r.deg===2?1.5:r.deg===1?3.5:5,src:`asks ${DEG_LABEL[Math.abs(j.edu)].toLowerCase()}${j.edu<0?" or equivalent":""}`});
+  parts.push({k:"bg",l:"Background",w:1,s:(p.inferred||[]).includes(j.role)?5:j.role==="other"?3:2,src:(p.inferred||[]).includes(j.role)?`your resume shows ${ROLES[j.role].toLowerCase()} work`:`your resume doesn't show ${ROLES[j.role].toLowerCase()} work`});
+  let pct=pctOf(parts), cap="";
+  if(r&&r.licMiss.length&&pct>35){ pct=35; cap="capped: a required license is missing"; }
+  if(p.auth==="needs"&&j.noSponsor){ pct=Math.min(pct,10); cap="capped: says it won't sponsor a visa"; }
+  if(j.clearance&&pct>60){ pct=60; cap="capped: needs a security clearance"; }
+  const known=parts.filter(x=>["skills","lic","deg"].includes(x.k)&&x.w>1).length+(j.reqYears?1:0);
+  // With nothing but the title to go on, don't claim a near-perfect fit.
+  if(!known&&pct>75) pct=75;
+  return {pct:Math.max(1,Math.min(99,pct)),parts,cap,thin:known===0};
+}
+function interestOf(j,p){
+  const parts=[];
+  const picked=p.roles&&p.roles.length;
+  parts.push({k:"role",l:"Role type",w:3,s:picked?(p.roles.includes(j.role)?5:1.5):3,src:picked?(p.roles.includes(j.role)?"one you picked":"not one you picked"):"you haven't picked role types"});
+  const pt=j._pay;
+  const a={balance:Math.max(1,Math.min(5,(BAL[j.role]||3)-(j.level>=4?.5:0)-(j.cat==="small"?.5:0)+(!j.fulltime?.5:0))),
+    pay:pt?(pt>=200?5:pt>=150?4.5:pt>=120?4:pt>=90?3:pt>=60?2:1.5):2.5, people:PEOPLE[j.role]||3,
+    growth:{small:5,growing:4,large:3}[j.cat]||3, brand:{large:5,growing:3.5,small:2}[j.cat]||3, mission:j._mission,
+    commute:j._dist==null?3:j._dist<1?5:j._dist<2?4:j._dist<3?3:j._dist<5?2:1, flex:j.setup==="Remote"?5:j.setup==="Hybrid"?4:3,
+    equity:j.equity?5:({small:4,growing:3.5,large:2.5}[j.cat]||3)};
+  const SRCI={balance:"rough guess by role type and company size",pay:j.pay?"from the posting":"not listed",people:"by role type",growth:"by company hiring volume",brand:"by company hiring volume",
+    commute:j._dist!=null?"from the neighborhood in the posting":"office location not listed",flex:j.setup?"from the posting":"not stated in the listing",mission:"by employer type and role",equity:j.equity?"from the posting":"guess by company size"};
+  (p.priorities||[]).forEach((k,i)=>{ if(a[k]!=null) parts.push({k,l:PRI[k][0],w:[3,2,1.25][i]||1,s:a[k],src:SRCI[k]}); });
+  if(p.cats&&p.cats.length) parts.push({k:"size",l:"Company size",w:1,s:p.cats.includes(j.cat)?5:2,src:"your size preference"});
+  if(p.minPay&&pt) parts.push({k:"floor",l:"Your pay floor",w:1.5,s:pt>=p.minPay?5:pt>=p.minPay*.85?3:1,src:`$${p.minPay}K minimum`});
+  return {pct:Math.max(1,Math.min(99,pctOf(parts))),parts};
 }
 function matchOf(j,p){
-  const a=attrs(j,p), W={fit:2.5}; (p.priorities||[]).forEach((k,i)=>W[k]=[3,2,1.25][i]||1);
-  Object.keys(PRI).forEach(k=>{ if(W[k]==null) W[k]=.3; }); if(a.size!=null) W.size=1;
-  let sum=0,max=0; Object.entries(W).forEach(([k,w])=>{ sum+=w*(a[k]??3); max+=w*5; });
-  const ghost=j.ghost===2?15:j.ghost===1?6:0, visa=p.auth==="needs"&&j.noSponsor?20:0;
-  return {pct:Math.max(1,Math.min(99,Math.round(40+60*(sum/max-.2)/.8)-ghost-visa)), a, W};
+  const q=qualOf(j,p), i=interestOf(j,p), ghost=j.ghost===2?15:j.ghost===1?6:0;
+  return {q:q.pct,i:i.pct,qd:q,id:i,qThin:q.thin,pct:Math.max(1,Math.round((q.pct+i.pct)/2)-ghost)};
 }
-const SRC=j=>({fit:[j.reqYears?"years asked for":"level from the title","your role interests",j._qs!=null?"required skills, licenses and degree vs. your resume":"resume words in the title"].join(", "),balance:"rough guess by role type and company size",pay:j.pay?"from the posting":"not listed",people:"by role type",growth:"by company hiring volume",brand:"by company hiring volume",
-  commute:j._dist!=null?"from the neighborhood in the posting":"office location not listed",flex:j.setup?"from the posting":"not stated in the listing",mission:"by employer type (nonprofit, school, government) and role",equity:j.equity?"from the posting":"guess by company size",size:"your company-size preference"});
 
 /* ---------- resume reading ---------- */
 async function readFile(f){
@@ -823,7 +853,7 @@ function renderBaseline(j,p){
 function homeXY(p,city){ const h=p.home&&p.home[city]; if(!h||!GEO[city]) return null; if(h.xy) return h.xy; return GEO[city].cent[h.hood]||null; }
 function prepJobs(p,city){
   const f=FEED[city]; if(!f||!f.jobs) return [];
-  const sig=[city,FEEDV,p.id,myYears(p),(p.priorities||[]).join(),(p.roles||[]).join(),(p.cats||[]).join(),p.exp,(p.inferred||[]).join(),JSON.stringify(p.home||{}),(p.kw||[]).length,skSig(p)].join("|");
+  const sig=[city,FEEDV,p.id,myYears(p),(p.priorities||[]).join(),(p.roles||[]).join(),(p.cats||[]).join(),p.exp,(p.inferred||[]).join(),JSON.stringify(p.home||{}),(p.kw||[]).length,skSig(p),p.minPay||0].join("|");
   if(MEMO&&MEMO.sig===sig) return MEMO.jobs;
   const kw=kwSet(p), home=homeXY(p,city), G=GEO[city];
   f.jobs.forEach((j,i)=>{ j._i=i;
@@ -846,6 +876,8 @@ function visibleJob(j,p,ignoreArea){
   if(F.roles&&!F.roles.has(j.role)) return false;
   if(F.levels&&!F.levels.has(j.level)) return false;
   if(F.payMin&&!(j._pay>=F.payMin)) return false;
+  if(F.minQ&&j._m.q<F.minQ) return false;
+  if(F.minI&&j._m.i<F.minI) return false;
   if(F.setup==="remote"&&j.setup!=="Remote") return false;
   if(F.setup==="hybrid"&&j.setup!=="Hybrid") return false;
   if(F.setup==="flex"&&!j.setup) return false;
@@ -907,7 +939,7 @@ function renderTop(p,city){
   $("#aib").onclick=openClaude;
   $("#refresh").onclick=()=>loadFeed(city,true);
 }
-function resetFilters(p){ UI.F={q:"",payMin:(p&&p.minPay)||0,setup:"any",cats:null,roles:p&&p.roles&&p.roles.length?new Set(p.roles):null,levels:null,orgs:null,area:null,showOver:false,showGhost:false,showVisa:false,sort:"match",saved:false,newOnly:false}; UI.limit=60; }
+function resetFilters(p){ UI.F={q:"",payMin:(p&&p.minPay)||0,setup:"any",cats:null,roles:p&&p.roles&&p.roles.length?new Set(p.roles):null,levels:null,orgs:null,area:null,showOver:false,showGhost:false,showVisa:false,minQ:0,minI:0,sort:"match",saved:false,newOnly:false}; UI.limit=60; }
 let openPop=null;
 function renderFilters(p,city){
   const F=UI.F, jobs=prepJobs(p,city);
@@ -917,6 +949,11 @@ function renderFilters(p,city){
   $("#fbar").innerHTML=`
     <div style="position:relative"><button class="fbtn ${F.payMin?"on":""}" data-pop="pay" aria-expanded="${openPop==="pay"}">${F.payMin?`Pay $${F.payMin}K+`:"Pay"} ▾</button>
       ${openPop==="pay"?`<div class="pop"><h4>Minimum listed pay (yearly)</h4><div class="rangeval" id="payv">${F.payMin?"$"+F.payMin+"K+":"Any"}</div><input type="range" id="payr" min="0" max="300" step="10" value="${F.payMin}" aria-label="Minimum pay in thousands"><p class="note">Listings that don't show pay are hidden while this is set. Hourly pay is converted at 2,080 hours a year.</p></div>`:""}</div>
+    <div style="position:relative"><button class="fbtn ${F.minQ||F.minI?"on":""}" data-pop="match" aria-expanded="${openPop==="match"}">${F.minQ||F.minI?[F.minQ?`Qualified ${F.minQ}%+`:"",F.minI?`Interest ${F.minI}%+`:""].filter(Boolean).join(" · "):"Match"} ▾</button>
+      ${openPop==="match"?`<div class="pop" style="width:300px"><h4>Qualification match</h4><div class="rangeval" id="mqv">${F.minQ?F.minQ+"%+":"Any"}</div><input type="range" id="mq" min="0" max="90" step="5" value="${F.minQ}" aria-label="Minimum qualification match">
+        <p class="note">How well you meet what the posting asks for: years of experience, required skills, licenses, degree, visa.</p>
+        <h4 style="margin-top:12px">Interest match</h4><div class="rangeval" id="miv">${F.minI?F.minI+"%+":"Any"}</div><input type="range" id="mi" min="0" max="90" step="5" value="${F.minI}" aria-label="Minimum interest match">
+        <p class="note">How well it fits what you said you want: role types, your ranked priorities, company size, pay floor.</p></div>`:""}</div>
     <div style="position:relative"><button class="fbtn ${F.setup!=="any"?"on":""}" data-pop="setup" aria-expanded="${openPop==="setup"}">${setL[F.setup]} ▾</button>
       ${openPop==="setup"?`<div class="pop"><div class="chips">${Object.entries(setL).map(([k,l])=>`<button class="chip" data-s="${k}" aria-pressed="${F.setup===k}">${k==="any"?"Any":l}</button>`).join("")}</div><p class="note">Based on what the posting says. Many postings don't mention it.</p></div>`:""}</div>
     <div style="position:relative"><button class="fbtn ${F.roles?"on":""}" data-pop="role" aria-expanded="${openPop==="role"}">Role${F.roles?` (${F.roles.size})`:""} ▾</button>
@@ -932,12 +969,14 @@ function renderFilters(p,city){
     ${F.showGhost?`<button class="fbtn on" id="hideghost">Showing likely ghost jobs ✕</button>`:""}
     ${F.showVisa?`<button class="fbtn on" id="hidevisa">Showing jobs that won't sponsor ✕</button>`:""}
     ${F.area?`<button class="fbtn on" id="clrarea2">${esc(F.area)} ✕</button>`:""}
-    <select id="sort" aria-label="Sort listings">${[["match","Best match"],["new","Newest"],["pay","Pay: high to low"]].map(([k,l])=>`<option value="${k}" ${F.sort===k?"selected":""}>${l}</option>`).join("")}</select>
+    <select id="sort" aria-label="Sort listings">${[["match","Best overall"],["qual","Most qualified"],["interest","Most interesting"],["new","Newest"],["pay","Pay: high to low"]].map(([k,l])=>`<option value="${k}" ${F.sort===k?"selected":""}>${l}</option>`).join("")}</select>
     <span class="count" id="count"></span>`;
+  const cnt=$("#count"); if(cnt&&UI.countText) cnt.textContent=UI.countText;
   $$("[data-pop]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); openPop=openPop===b.dataset.pop?null:b.dataset.pop; renderFilters(p,city); });
   $$(".pop").forEach(x=>x.onclick=e=>e.stopPropagation());
   const re=()=>{ UI.limit=60; renderList(p,city); renderMap(p,city); };
   const payr=$("#payr"); if(payr){ payr.oninput=e=>{ F.payMin=+e.target.value; $("#payv").textContent=F.payMin?"$"+F.payMin+"K+":"Any"; re(); }; payr.onchange=()=>renderFilters(p,city); }
+  [["mq","minQ","mqv"],["mi","minI","miv"]].forEach(([id,k,v])=>{ const el=$("#"+id); if(!el) return; el.oninput=e=>{ F[k]=+e.target.value; $("#"+v).textContent=F[k]?F[k]+"%+":"Any"; re(); }; el.onchange=()=>renderFilters(p,city); });
   $$("[data-s]").forEach(b=>b.onclick=()=>{ F.setup=b.dataset.s; openPop=null; renderFilters(p,city); re(); });
   const multi=(attr,field,all,conv)=>$$(`[data-${attr}]`).forEach(b=>b.onclick=()=>{ const k=conv(b.dataset[attr]); F[field]=F[field]||new Set(all);
     if(F[field].size===all.length) F[field]=new Set([k]); else if(F[field].has(k)) F[field].delete(k); else F[field].add(k);
@@ -960,7 +999,7 @@ function artHTML(j,extra){
 function cardHTML(j,p,small){
   const saved=(p.saved||[]).includes(jkey(j));
   return `<article class="lcard" data-i="${j._i}" tabindex="0" aria-label="${esc(j.title)} at ${esc(j.company)}">
-    ${artHTML(j,`${small?"":`<span class="badge" title="Estimated fit with your experience and priorities">${j._m.pct}% match</span>`}${j.isNew&&!small?`<span class="badge new">New</span>`:""}<button class="heart" data-save="${j._i}" aria-pressed="${saved}" aria-label="${saved?"Remove from saved":"Save"}">${saved?"♥":"♡"}</button>`)}
+    ${artHTML(j,`${small?"":`<span class="badge two" title="Qualification: how well you meet what the posting asks for. Interest: how well it fits what you said you want."><b>${j._m.qThin?"≈":""}${j._m.q}%</b> qualified<i></i><b>${j._m.i}%</b> interest</span>`}${j.isNew&&!small?`<span class="badge new">New</span>`:""}<button class="heart" data-save="${j._i}" aria-pressed="${saved}" aria-label="${saved?"Remove from saved":"Save"}">${saved?"♥":"♡"}</button>`)}
     <div class="lbody">
       <div class="price ${j.pay?"":"muted"}">${esc(priceText(j))}</div>
       <div class="facts">${factsHTML(j)}</div>
@@ -971,7 +1010,7 @@ function cardHTML(j,p,small){
 }
 function sorted(jobs,F){
   const dt=j=>j.posted||j.seen||"";
-  const by={match:(a,b)=>b._m.pct-a._m.pct||dt(b).localeCompare(dt(a)), new:(a,b)=>dt(b).localeCompare(dt(a))||b._m.pct-a._m.pct, pay:(a,b)=>b._pay-a._pay||b._m.pct-a._m.pct}[F.sort]||((a,b)=>b._m.pct-a._m.pct);
+  const by={match:(a,b)=>b._m.pct-a._m.pct||dt(b).localeCompare(dt(a)), qual:(a,b)=>b._m.q-a._m.q||b._m.i-a._m.i, interest:(a,b)=>b._m.i-a._m.i||b._m.q-a._m.q, new:(a,b)=>dt(b).localeCompare(dt(a))||b._m.pct-a._m.pct, pay:(a,b)=>b._pay-a._pay||b._m.pct-a._m.pct}[F.sort]||((a,b)=>b._m.pct-a._m.pct);
   return jobs.slice().sort(by);
 }
 function renderList(p,city){
@@ -996,8 +1035,8 @@ function renderList(p,city){
     <div class="grid">${shown.map(j=>cardHTML(j,p)).join("")}${!ready?Array.from({length:6}).map(()=>`<div class="skel" aria-hidden="true"></div>`).join(""):""}</div>
     ${vis.length>shown.length?`<div class="more"><button class="tbtn" id="more">Show ${Math.min(60,vis.length-shown.length)} more</button></div>`:""}
     ${ready&&!vis.length?`<div class="empty">No jobs match these filters and must-haves. Loosen a filter or edit your preferences.</div>`:""}
-    <p class="foot">Listings are collected every 6 hours from employers' job boards on Greenhouse, Lever, Ashby and Workable, and from New York City government postings. Fast-food and retail store jobs are left out. Match % is Minerva's estimate, worked out in your browser from your experience level, the role types you want, the skills, licenses and degree the posting requires compared with your resume, and your ranked priorities. Pay, location, work setup, dates and the years of experience asked for come from the posting when it lists them; jobs asking for more years than you have are hidden unless you choose to show them. Listings that look like ghost jobs (talent-pool postings, open for months, or reposted again and again) are ranked lower and the strongest cases are hidden; these are signals, not proof. Work-life balance, people-facing work and company size are rough guesses from the role type and how many jobs the company has open, not from the posting. Your resume and profile stay in this browser. <a href="feed.html">Raw job feed</a></p>`;
-  const c=$("#count"); if(c) c.textContent=ready?`${vis.length.toLocaleString()} jobs`:"";
+    <p class="foot">Listings are collected every 6 hours from employers' job boards on Greenhouse, Lever, Ashby and Workable, and from New York City government postings. Fast-food and retail store jobs are left out. Each job gets two estimates, worked out in your browser. Qualified % is how well you meet what the posting asks for: years of experience, required skills, licenses and degree compared with your resume, and visa sponsorship. Interest % is how well it fits what you said you want: role types, ranked priorities, company size and pay floor. When a posting lists no requirements, the qualification estimate falls back to the job title's level, is capped at 75% and marked ≈. Pay, location, work setup, dates and the years of experience asked for come from the posting when it lists them; jobs asking for more years than you have are hidden unless you choose to show them. Listings that look like ghost jobs (talent-pool postings, open for months, or reposted again and again) are ranked lower and the strongest cases are hidden; these are signals, not proof. Work-life balance, people-facing work and company size are rough guesses from the role type and how many jobs the company has open, not from the posting. Your resume and profile stay in this browser. <a href="feed.html">Raw job feed</a></p>`;
+  UI.countText=ready?`${vis.length.toLocaleString()} jobs`:""; const c=$("#count"); if(c) c.textContent=UI.countText;
   const on=$("#obnow"); if(on) on.onclick=()=>startOnboard(p);
   const mine=$("#mine"); if(mine) mine.onclick=()=>startOnboard(null);
   const rt=$("#retry"); if(rt) rt.onclick=()=>loadFeed(city,true);
@@ -1091,7 +1130,7 @@ function renderMap(p,city){
 function areaHover(pin,city){
   const hc=$("#hover"), top=pin.list.slice().sort((a,b)=>b._m.pct-a._m.pct).slice(0,3);
   hc.innerHTML=`<div class="b"><div class="ltitle">${esc(pin.area)}</div><div class="lsub">${pin.list.length.toLocaleString()} matching job${pin.list.length>1?"s":""}${GEO[city].cent[pin.area]?"":" · whole borough or area"}</div>
-    ${top.map(j=>`<div class="hrow"><b>${j._m.pct}%</b> ${esc(j.title)} <span class="lsub">· ${esc(j.company)}</span></div>`).join("")}<div class="est" style="margin-top:6px">Click to show these in the list</div></div>`;
+    ${top.map(j=>`<div class="hrow"><b>${j._m.q}/${j._m.i}</b> ${esc(j.title)} <span class="lsub">· ${esc(j.company)}</span></div>`).join("")}<div class="est" style="margin-top:6px">qualified % / interest % · click to show these in the list</div></div>`;
   hc.classList.add("show");
   const pt=svg.createSVGPoint(); pt.x=pin.x; pt.y=pin.y; const s=pt.matrixTransform(svg.getScreenCTM()); const br=svg.getBoundingClientRect();
   const sx=s.x-br.left, sy=s.y-br.top; let left=sx-130, top2=sy-hc.offsetHeight-36; if(top2<8) top2=sy+36; left=Math.max(8,Math.min(left,br.width-268));
@@ -1126,12 +1165,12 @@ function reasons(j,p){
 function renderDetail(p,city){
   const jobs=prepJobs(p,city), j=jobs.find(x=>jkey(x)===UI.detail);
   if(!j){ UI.detail=null; $("#sheet").innerHTML=""; return; }
-  const saved=(p.saved||[]).includes(jkey(j)), m=j._m, src=SRC(j), rs=reasons(j,p);
-  const rows=[["fit","Fit with your experience"],...(p.priorities||[]).map(k=>[k,PRI[k][0]])]; if(m.a.size!=null) rows.push(["size","Company size you picked"]);
+  const saved=(p.saved||[]).includes(jkey(j)), m=j._m, rs=reasons(j,p);
+  const bars=parts=>parts.map(x=>`<div class="mbar"><span>${esc(x.l)}<span class="src">${esc(x.src||"")}</span></span><span class="tr"><i style="width:${x.s*20}%"></i></span><span class="w">${x.s.toFixed(1).replace(".0","")}/5</span></div>`).join("");
   const sim=jobs.filter(x=>x!==j&&x.role===j.role&&visibleJob(x,p,true)).sort((a,b)=>b._m.pct-a._m.pct).slice(0,3);
   $("#sheet").innerHTML=`<div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-label="${esc(j.title)} at ${esc(j.company)}">
    <div class="sheet">
-    ${artHTML(j,`<span class="badge" style="top:14px;left:18px">${m.pct}% match</span><button class="heart" id="dheart" aria-pressed="${saved}" aria-label="${saved?"Remove from saved":"Save"}">${saved?"♥":"♡"}</button><button class="x" id="dx" aria-label="Close">×</button>`)}
+    ${artHTML(j,`<span class="badge two" style="top:14px;left:18px"><b>${m.q}%</b> qualified<i></i><b>${m.i}%</b> interest</span><button class="heart" id="dheart" aria-pressed="${saved}" aria-label="${saved?"Remove from saved":"Save"}">${saved?"♥":"♡"}</button><button class="x" id="dx" aria-label="Close">×</button>`)}
     <div class="sbody">
       <div>
         <div class="price ${j.pay?"":"muted"}">${esc(priceText(j))}</div>
@@ -1156,8 +1195,11 @@ function renderDetail(p,city){
       </div>
       <div>
         <div class="apply">
-          <div class="big">${m.pct}%</div><div class="est">Estimated match with your experience and priorities</div>
-          ${rows.map(([k,l])=>`<div class="mbar"><span>${esc(l)}<span class="src">${esc(src[k]||"")}</span></span><span class="tr"><i style="width:${(m.a[k]??3)*20}%"></i></span><span class="w">${(m.a[k]??3).toFixed(1).replace(".0","")}/5</span></div>`).join("")}
+          <div class="twobig"><div><div class="big">${m.q}%</div><div class="est">Qualified${m.qd.thin?" (limited info)":""}</div></div><div><div class="big">${m.i}%</div><div class="est">Interest</div></div></div>
+          <h4 class="mh">Qualification · do you meet what it asks for?</h4>
+          ${bars(m.qd.parts)}${m.qd.cap?`<p class="note bad">${esc(m.qd.cap[0].toUpperCase()+m.qd.cap.slice(1))}.</p>`:""}${m.qd.thin?`<p class="note">The posting lists no years, skills, licenses or degree Minerva could read, so this rests on the title's level.</p>`:""}
+          <h4 class="mh">Interest · is it what you want?</h4>
+          ${bars(m.id.parts)}${(p.priorities||[]).length?"":`<p class="note">Pick your top priorities in Preferences to sharpen this.</p>`}
           <a class="btn" href="${esc(linkOf(j))}" target="_blank" rel="noopener">${j.src==="nycgov"?"Apply on NYC Jobs ↗":j.src==="usajobs"?"Apply on USAJOBS ↗":j.src==="workable"?"View and apply ↗":`Apply on ${esc(j.company)}'s site ↗`}</a>
           <p class="note">${j.src==="nycgov"?"Opens the posting on the City of New York's job site.":j.src==="usajobs"?"Opens the posting on the federal government's job site.":j.src==="workable"?"Opens the posting on Workable, the hiring system this employer uses.":"Opens the employer's own job page in a new tab."}</p>
         </div>
