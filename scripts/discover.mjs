@@ -10,6 +10,9 @@ const OUT = path.join(ROOT, "data", "boards.json");
 const UA = process.env.USER_AGENT || "MinervaJobFeed/0.1 (+https://github.com)";
 const CRAWLS = Number(process.env.CC_CRAWLS || 2);          // how many recent crawls to read
 const MAX_PAGES = Number(process.env.CC_MAX_PAGES || 40);   // index pages per domain per crawl
+const BUDGET_MS = Number(process.env.DISCOVER_MINUTES || 25) * 60000; // stop looking after this long
+const START = Date.now();
+const outOfTime = () => Date.now() - START > BUDGET_MS;
 
 const PATTERNS = [
   { ats: "greenhouse", url: "boards.greenhouse.io/*" },
@@ -70,18 +73,22 @@ async function fromWayback(found) {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789".split("");
   for (const p of PATTERNS) {
     const host = p.url.replace("/*", "");
-    let added = 0, empty = 0;
+    let added = 0, empty = 0, streak = 0, asked = 0;
     for (const ch of chars) {
+      if (outOfTime()) { console.log("Time budget reached; stopping the archive search."); break; }
+      if (streak >= 3) { console.log(`  ${host}: 3 failures in a row, skipping the rest`); break; }
+      asked++;
       const url = `https://web.archive.org/cdx/search/cdx?url=${host}/${ch}&matchType=prefix&fl=original&collapse=urlkey&filter=statuscode:200&limit=${WB_LIMIT}`;
-      const body = await getText(url, 3, 120000);
-      if (!body) empty++;
+      const body = await getText(url, 2, 45000);
+      if (!body) { empty++; streak++; } else streak = 0;
       for (const line of body.split("\n")) {
         const s = line && slugFromUrl(p.ats, line.trim());
         if (s && !found[p.ats].has(s)) { found[p.ats].add(s); added++; }
       }
       await sleep(1500); // the archive asks for a gentle pace
     }
-    console.log(`Wayback ${host}: +${added} boards (${empty}/${chars.length} requests empty)`);
+    console.log(`Wayback ${host}: +${added} boards (${empty}/${asked} requests empty)`);
+    await save(found);
   }
 }
 
@@ -89,16 +96,20 @@ async function fromCommonCrawl(found) {
   const info = await getText("https://index.commoncrawl.org/collinfo.json");
   if (!info) { console.log("Common Crawl index unavailable; skipping."); return; }
   const crawls = JSON.parse(info).slice(0, CRAWLS);
-  for (const c of crawls) {
-    for (const p of PATTERNS) {
+  let todo = crawls.flatMap(c => PATTERNS.map(p => ({ c, p })));
+  for (let pass = 1; pass <= 2 && todo.length && !outOfTime(); pass++) {
+    if (pass === 2) { console.log(`Retrying ${todo.length} unanswered queries after a pause…`); await sleep(60000); }
+    const missed = [];
+    for (const { c, p } of todo) {
+      if (outOfTime()) { console.log("Time budget reached; stopping Common Crawl."); break; }
       const base = `${c["cdx-api"]}?url=${encodeURIComponent(p.url)}&output=json&fl=url&filter=status:200`;
       const meta = await getText(base + "&showNumPages=true");
-      if (!meta) { console.log(`${c.id} ${p.url}: no answer from the index`); continue; }
+      if (!meta) { console.log(`${c.id} ${p.url}: no answer from the index`); missed.push({ c, p }); continue; }
       let pages = 1;
       try { pages = JSON.parse(meta).pages || 1; } catch { console.log(`  unexpected reply: ${meta.slice(0, 120)}`); }
       pages = Math.min(pages, MAX_PAGES);
       let added = 0;
-      for (let pg = 0; pg < pages; pg++) {
+      for (let pg = 0; pg < pages && !outOfTime(); pg++) {
         const body = await getText(`${base}&page=${pg}`);
         for (const line of body.split("\n")) {
           if (!line) continue;
@@ -107,8 +118,20 @@ async function fromCommonCrawl(found) {
         await sleep(400); // be gentle with the free index
       }
       console.log(`${c.id} ${p.url}: ${pages} pages, +${added} boards`);
+      await save(found);
     }
+    todo = missed;
   }
+}
+
+let deadList = null;
+async function save(found) {
+  if (!deadList) { deadList = {}; try { deadList = JSON.parse(await fs.readFile(OUT, "utf8")).dead || {}; } catch {} }
+  const out = { updatedAt: new Date().toISOString(), dead: deadList };
+  for (const k of Object.keys(found)) out[k] = [...found[k]].sort();
+  await fs.mkdir(path.dirname(OUT), { recursive: true });
+  await fs.writeFile(OUT, JSON.stringify(out, null, 0));
+  return out;
 }
 
 export async function loadSeeds() {
@@ -139,11 +162,6 @@ if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1])))
   }
   const after = Object.values(found).reduce((n, x) => n + x.size, 0);
   console.log(`New boards found this run: ${after - before}`);
-  let dead = {};
-  try { dead = JSON.parse(await fs.readFile(OUT, "utf8")).dead || {}; } catch {}
-  const out = { updatedAt: new Date().toISOString(), dead };
-  for (const k of Object.keys(found)) out[k] = [...found[k]].sort();
-  await fs.mkdir(path.dirname(OUT), { recursive: true });
-  await fs.writeFile(OUT, JSON.stringify(out, null, 0));
+  const out = await save(found);
   console.log(`Boards: greenhouse ${out.greenhouse.length}, lever ${out.lever.length}, ashby ${out.ashby.length}`);
 }
