@@ -55,6 +55,8 @@ jobs:
           PREV_URL: ${{ steps.pages.outputs.base_url }}
           BOARD_LIMIT: ${{ inputs.board_limit || '0' }}
           CONCURRENCY: "16"
+          USAJOBS_KEY: ${{ secrets.USAJOBS_KEY }}
+          USAJOBS_EMAIL: ${{ secrets.USAJOBS_EMAIL }}
         run: node scripts/fetch.mjs
 
       - name: Save the board list

@@ -6,6 +6,7 @@
 //   site/data/seen.json             job id -> first-seen date (lets the next run mark New / Closed)
 import fs from "node:fs/promises";
 import path from "node:path";
+import { workableJobs, nycGovJobs, usaJobs, isRetailOrFastFood } from "./sources.mjs";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const BOARDS = path.join(ROOT, "data", "boards.json");
@@ -17,7 +18,7 @@ const PREV_URL = process.env.PREV_URL || "";                 // live site, to ca
 const FIXTURES = process.env.FIXTURES || "";                 // offline test mode
 
 export const CITIES = {
-  nyc: { name: "New York", re: /\b(new york|nyc|manhattan|brooklyn|queens|bronx|staten island|long island city)\b/i },
+  nyc: { name: "New York", re: /\b(new york|nyc|manhattan|brooklyn|queens|bronx|staten island|long island city|jersey city|hoboken)\b/i },
   sf: { name: "San Francisco Bay Area", re: /\b(san francisco|sf\b|bay area|oakland|berkeley|emeryville|palo alto|menlo park|mountain view|sunnyvale|san mateo|redwood city|san jose|santa clara|south san francisco|foster city|burlingame)\b/i },
   boston: { name: "Boston", re: /\b(boston|cambridge, ma|somerville)\b/i },
   seattle: { name: "Seattle", re: /\b(seattle|bellevue|redmond|kirkland)\b/i },
@@ -28,7 +29,8 @@ export const CITIES = {
   denver: { name: "Denver / Boulder", re: /\b(denver|boulder)\b/i },
   miami: { name: "Miami", re: /\b(miami|fort lauderdale)\b/i },
 };
-const REMOTE_RE = /\bremote\b|\banywhere\b|work from home/i;
+const REMOTE_RE = /\bremote\b|\banywhere\b|work from home|telecommute/i;
+const EXTRA = process.env.EXTRA_SOURCES !== "0" && !FIXTURES;   // workable, nycgov, usajobs
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function getJSON(url, tries = 3) {
@@ -144,9 +146,19 @@ export async function run() {
     return r.jobs;
   });
 
+  let extra = [];
+  if (EXTRA) {
+    console.log("Reading other sources…");
+    const parts = await Promise.all([workableJobs(), nycGovJobs(), usaJobs()].map(p => p.catch(e => { console.log("  source failed: " + e.message); return []; })));
+    extra = parts.flat();
+  }
   const today = new Date().toISOString().slice(0, 10);
-  const byId = new Map();
-  for (const j of results.flat()) if (j.t && j.u && !byId.has(j.i)) byId.set(j.i, j);
+  const byId = new Map(); let excluded = 0;
+  for (const j of [...results.flat(), ...extra]) {
+    if (!j.t || !j.u || byId.has(j.i)) continue;
+    if (isRetailOrFastFood(j.t)) { excluded++; continue; }
+    byId.set(j.i, j);
+  }
   // Same company posting the same title in the same place on two boards: keep one.
   const dedupe = new Map();
   for (const j of byId.values()) { const k = `${j.c}|${j.t}|${j.l}`.toLowerCase(); if (!dedupe.has(k)) dedupe.set(k, j); }
@@ -174,8 +186,8 @@ export async function run() {
     updatedAt: new Date().toISOString(), seconds: Math.round((Date.now() - t0) / 1000),
     boards: list.length, boardsFailed: failed, boardsGone: Object.values(dead).flat().length,
     jobs: jobs.length, newSinceLastRun: PREV_URL && Object.keys(seenPrev).length ? newCount : null, closedSinceLastRun: Object.keys(seenPrev).length ? closed : null,
-    withPay: jobs.filter(j => j.p).length, companies: companies.size,
-    bySource: Object.fromEntries(["greenhouse", "lever", "ashby"].map(s => [s, jobs.filter(j => j.s === s).length])),
+    withPay: jobs.filter(j => j.p).length, companies: companies.size, excludedRetailAndFastFood: excluded,
+    bySource: jobs.reduce((m, j) => (m[j.s] = (m[j.s] || 0) + 1, m), {}),
     cities: Object.fromEntries(Object.entries(buckets).map(([k, v]) => [k, { name: CITIES[k]?.name || "Remote", jobs: v.length }]).sort((a, b) => b[1].jobs - a[1].jobs)),
   };
   await fs.writeFile(path.join(OUTDIR, "stats.json"), JSON.stringify(stats, null, 1));

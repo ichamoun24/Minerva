@@ -9,6 +9,16 @@ It runs entirely on GitHub's free tools:
 
 No credit card, no API keys, nothing to install on your computer.
 
+## Other sources
+
+Besides company boards on Greenhouse, Lever and Ashby, each run also reads (see `scripts/sources.mjs`):
+
+- **Workable's public job search** (jobs.workable.com), city by city. This is where many schools, clinics, nonprofits, studios and small businesses post.
+- **New York City government jobs** from NYC Open Data (updated daily).
+- **Federal jobs from USAJOBS**, if you add two repository secrets: `USAJOBS_KEY` (free, from developer.usajobs.gov) and `USAJOBS_EMAIL` (the email you registered with). Settings → Secrets and variables → Actions.
+
+Fast-food and retail store jobs (cashier, barista, line cook, store associate and similar) are dropped from every source. The count is in `stats.json` as `excludedRetailAndFastFood`.
+
 ## The website
 
 `site/index.html` is the Minerva app. It loads the feed for one city at a time (`site/data/{city}.json`) and does everything else in the visitor's browser:

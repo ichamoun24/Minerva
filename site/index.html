@@ -323,13 +323,14 @@ const hasMap=c=>!!GEO[c];
 const CATS={large:"Big company",growing:"Growing company",small:"Small team"};
 const CAT_NOTE={large:"300+ open roles in the feed",growing:"50–299 open roles in the feed",small:"under 50 open roles in the feed"};
 const CAT_COLOR={large:"large",growing:"late",small:"early"};
-const ROLES={sales:"Sales",partnerships:"Partnerships & BD",success:"Account mgmt & customer success",strategy:"Strategy & operations",corpdev:"Corp dev & M&A",ir:"Investor relations",finance:"Finance & accounting",investing:"Investing & trading",marketing:"Marketing & comms",product:"Product",design:"Design",engineering:"Engineering",data:"Data & analytics",people:"People & recruiting",legal:"Legal & policy",other:"Other"};
+const ROLES={arts:"Arts & culture",education:"Education & teaching",health:"Healthcare & care",community:"Nonprofit & community",trades:"Skilled trades & culinary",sales:"Sales",partnerships:"Partnerships & BD",success:"Account mgmt & customer success",strategy:"Strategy & operations",corpdev:"Corp dev & M&A",ir:"Investor relations",finance:"Finance & accounting",investing:"Investing & trading",marketing:"Marketing & comms",product:"Product",design:"Design",engineering:"Engineering",data:"Data & analytics",people:"People & recruiting",legal:"Legal & policy",other:"Other"};
 const LEVELS=["Internship","Entry level","Mid level","Senior","Manager / director","VP and above"];
 const EXP={student:["Student or new grad","Internships and first jobs",[0,1]],early:["0–2 years","Analyst or associate level",[1,2]],mid:["3–5 years","Experienced individual contributor",[2,3]],senior:["6–9 years","Senior or first-time manager",[3,4]],lead:["10+ years","Manager, director or above",[4,5]]};
 const PRI={
   balance:["Work-life balance","Reasonable hours (a rough guess by role type)"],
   pay:["Pay","Highest listed salary"],
   people:["People-facing work","Clients, partners and teams over spreadsheets"],
+  mission:["Mission & impact","Arts, education, care, nonprofit and public-service work (judged from the role and employer)"],
   growth:["Growth & learning","Smaller, fast-moving teams"],
   brand:["Big company","Large, established employers"],
   commute:["Short commute","Close to home, when the posting names a neighborhood"],
@@ -417,8 +418,8 @@ function openClaude(){
 }
 
 /* ---------- scoring ---------- */
-const BAL={sales:3,partnerships:4,success:4,strategy:3,corpdev:2,ir:4,finance:3.5,investing:2,marketing:4,product:3,design:4,engineering:3.5,data:4,people:4,legal:3,other:3};
-const PEOPLE={sales:5,partnerships:5,success:5,ir:4,people:4,marketing:3,strategy:3,product:3,corpdev:2,investing:3,finance:2,legal:2,data:1.5,engineering:1,design:2,other:3};
+const BAL={arts:3.5,education:3.5,health:3,community:3.5,trades:3.5,sales:3,partnerships:4,success:4,strategy:3,corpdev:2,ir:4,finance:3.5,investing:2,marketing:4,product:3,design:4,engineering:3.5,data:4,people:4,legal:3,other:3};
+const PEOPLE={arts:3,education:5,health:5,community:5,trades:2,sales:5,partnerships:5,success:5,ir:4,people:4,marketing:3,strategy:3,product:3,corpdev:2,investing:3,finance:2,legal:2,data:1.5,engineering:1,design:2,other:3};
 function levelFit(j,p){ const r=(EXP[p.exp]||EXP.early)[2], L=j.level; if(L>=r[0]&&L<=r[1]) return 5; const d=L<r[0]?r[0]-L:L-r[1]; return d===1?3:d===2?1.5:1; }
 function roleFit(j,p){ if(p.roles&&p.roles.length) return p.roles.includes(j.role)?5:1.5; return (p.inferred||[]).includes(j.role)?4.5:j.role==="other"?2:2.5; }
 function attrs(j,p){
@@ -427,7 +428,7 @@ function attrs(j,p){
   let bal=BAL[j.role]||3; if(j.level>=4) bal-=.5; if(j.cat==="small") bal-=.5; if(!j.fulltime) bal+=.5; bal=Math.max(1,Math.min(5,bal));
   const d=j._dist; const commute=d==null?3:d<1?5:d<2?4:d<3?3:d<5?2:1;
   const a={fit,balance:bal,pay,people:PEOPLE[j.role]||3,growth:{small:5,growing:4,large:3}[j.cat]||3,brand:{large:5,growing:3.5,small:2}[j.cat]||3,
-    commute,flex:j.setup==="Remote"?5:j.setup==="Hybrid"?4:3,equity:j.equity?5:({small:4,growing:3.5,large:2.5}[j.cat]||3)};
+    mission:j._mission,commute,flex:j.setup==="Remote"?5:j.setup==="Hybrid"?4:3,equity:j.equity?5:({small:4,growing:3.5,large:2.5}[j.cat]||3)};
   if(p.cats&&p.cats.length) a.size=p.cats.includes(j.cat)?5:2;
   return a;
 }
@@ -438,7 +439,7 @@ function matchOf(j,p){
   return {pct:Math.max(1,Math.min(99,Math.round(40+60*(sum/max-.2)/.8))), a, W};
 }
 const SRC=j=>({fit:"your level, role interests and resume words vs. the title",balance:"rough guess by role type and company size",pay:j.pay?"from the posting":"not listed",people:"by role type",growth:"by company hiring volume",brand:"by company hiring volume",
-  commute:j._dist!=null?"from the neighborhood in the posting":"office location not listed",flex:j.setup?"from the posting":"not stated in the listing",equity:j.equity?"from the posting":"guess by company size",size:"your company-size preference"});
+  commute:j._dist!=null?"from the neighborhood in the posting":"office location not listed",flex:j.setup?"from the posting":"not stated in the listing",mission:"rough guess from the role type and employer name",equity:j.equity?"from the posting":"guess by company size",size:"your company-size preference"});
 
 /* ---------- resume reading ---------- */
 async function readFile(f){
@@ -495,10 +496,10 @@ function loadFeed(city,force){
 function parsePay(s){
   const main=String(s||"").split("•")[0].trim(); if(!main) return {text:"",top:0,lo:0};
   const usd=/\$/.test(main)&&!/(CA|AU|A|NZ|S|HK|MX|C)\$/.test(main);
-  const hourlyWord=/(per hour|\/\s?h(ou)?r|hourly)/i.test(main), monthly=/(per month|\/\s?mo(nth)?\b)/i.test(main);
+  const hourlyWord=/(per hour|\/\s?h(ou)?r|hourly)/i.test(main), monthly=/(per month|\/\s?mo(nth)?\b)/i.test(main), daily=/(per day|\/\s?day|daily)/i.test(main);
   const nums=[...main.matchAll(/(\d[\d,]*(?:\.\d+)?)([kKmM])?(?![a-zA-Z])/g)].map(m=>{ let v=parseFloat(m[1].replace(/,/g,"")); if(/k/i.test(m[2]||"")) v*=1e3; else if(/m/i.test(m[2]||"")) v*=1e6; return v; }).filter(v=>v>0);
   if(!usd||!nums.length) return {text:main,top:0,lo:0};
-  const hi=Math.max(...nums), lo=Math.min(...nums), hourly=hourlyWord||(hi<300&&!monthly), mult=hourly?2080:monthly?12:1;
+  const hi=Math.max(...nums), lo=Math.min(...nums), hourly=!daily&&(hourlyWord||(hi<300&&!monthly)), mult=daily?260:hourly?2080:monthly?12:1;
   const text=hourly&&!hourlyWord?main+" /hr":main, top=hi*mult/1000;
   if(top<10||top>5000) return {text,top:0,lo:0,hourly};
   return {text,top,lo:lo*mult/1000,hourly};
@@ -516,8 +517,13 @@ const ROLE_RULES=[
   ["marketing",R("product marketing|growth marketing")],
   ["strategy",R("(strategy|operations|business|strategic) analyst")],
   ["data",R("\\bdata\\b|analytics|\\banalyst\\b|scientist|economist|statistic|insights|business intelligence|\\bbi\\b")],
-  ["engineering",R("engineer|engineering|developer|software|technical staff|\\bsre\\b|devops|infrastructure|architect|machine learning|\\bml\\b|security|systems admin|\\bit (support|specialist|manager|admin)|\\bqa\\b|quality assurance|firmware|hardware|robotics|technician")],
+  ["engineering",R("engineer|engineering|developer|software|technical staff|\\bsre\\b|devops|infrastructure|architect|machine learning|\\bml\\b|security|systems admin|\\bit (support|specialist|manager|admin)|\\bqa\\b|quality assurance|firmware|hardware|robotics")],
   ["product",R("product (manager|owner|lead|director|management|ops|operations)|head of product|vp,? product|technical program manager")],
+  ["arts",R("\\b(artist|\\barts\\b|public art|fine art|art (project|program|production|studio|department|fair)|art (director|teacher|handler|instructor|educator)|curator|curatorial|museum|gallery|galleries|ceramic|pottery|potter|sculpt|painter|illustrat|photograph|videograph|filmmak|film|animator|musician|music|theat(er|re)|\\bdance|dancer|choreograph|stage manager|costume|exhibition|archivist|conservator|registrar|docent|teaching artist|tattoo|jewel|glass ?blow|printmak|craft)")],
+  ["education",R("teacher|teaching|tutor|instructor|professor|lecturer|educator|paraprofessional|\\bschool\\b|curriculum|literacy|early childhood|preschool|childcare|child care|admissions|academic|librarian|\\bcoach\\b")],
+  ["health",R("\\bnurse|\\brn\\b|\\blpn\\b|nursing|physician|\\bdoctor|medical|clinic|clinical|therapist|therapy|psycholog|psychiatr|counselor|social worker|lcsw|case manager|behavior technician|\\brbt\\b|bcba|dental|dentist|hygienist|pharmac|veterinar|vet tech|caregiver|home health|patient|health aide|phlebotom|radiolog|optometr|dietitian|nutritionist|midwife|doula|occupational|speech")],
+  ["community",R("program (coordinator|associate|assistant|manager|director|specialist)|community|outreach|advocate|organizer|volunteer|(?<!business )development (associate|officer|director|coordinator|manager)|\\bgrants?\\b|fundrais|philanthrop|donor|youth|caseworker|case worker|housing|food bank|nonprofit|social services|eligibility|resident services|ranger|parks")],
+  ["trades",R("carpenter|electrician|plumber|hvac|welder|machinist|mechanic|technician|fabricat|woodwork|furniture|upholster|mason|construction|foreman|superintendent|installer|maintenance|facilities|landscap|gardener|horticultur|arborist|\\bchef\\b|sous chef|pastry|baker|butcher|culinary|brewer|tailor|seamstress|locksmith|surveyor|estimator|custodian|carpentry")],
   ["marketing",R("marketing|brand|growth|content|communications|\\bcomms\\b|\\bpr\\b|public relations|social media|copywriter|\\bseo\\b|demand gen|\\bevents?\\b|community|creative|editor|writer|journalist|producer|media|influencer")],
   ["partnerships",R("partnership|partner (manager|development|success|lead)|business development|\\bbd\\b|alliances|channel|ecosystem|licensing")],
   ["success",R("customer success|account manag|client (success|manager|services|relations|partner)|relationship manager|customer experience|support|implementation|onboarding|solutions consultant|customer (care|service)")],
@@ -535,7 +541,7 @@ function levelOf(title){
   if(/\b(assistant vice president|avp)\b/.test(t)) return 2;
   if(/\b(chief|ceo|cfo|cto|coo|cmo|svp|evp|vice president|vp|president|head of|general manager)\b/.test(t)) return 5;
   if(/\b(director|senior manager|sr\.? manager|group manager)\b/.test(t)) return 4;
-  const icMgr=/(account|product|program|project|success|partner|partnerships|community|office|social|marketing|brand|content|events?|sales|territory|relationship|client) manager/.test(t);
+  const icMgr=/(account|product|program|project|success|partner|partnerships|community|office|social|media|marketing|brand|content|events?|sales|territory|relationship|client) manager/.test(t);
   if(/\b(principal|staff|senior|sr\.?|lead|iii|iv)\b/.test(t)){ if(/\bmanager\b/.test(t)&&!icMgr) return 4; return 3; }
   if(/\bmanager\b/.test(t)) return icMgr?2:3;
   if(/\b(junior|jr\.?|entry|new grad|graduate|associate|coordinator|assistant|representative|sdr|bdr|fellow|trainee|analyst|ambassador)\b|\b(i|1)$|\blevel (i|1)\b/.test(t)) return 1;
@@ -560,7 +566,10 @@ function areaOf(loc,city){
   return A.none;
 }
 const areaXY=(city,name)=>(GEO[city]&&(GEO[city].cent[name]||(AREA_XY[city]||{})[name]))||null;
-function fromFeed(r,city,ref){
+const MISSION_ROLES=new Set(["arts","education","health","community"]);
+const MISSION_ORG=/foundation|museum|school|academy|universit|college|hospital|health|nonprofit|charit|library|theat|institute|society|council|alliance|\bfund\b|\btrust\b|center|centre|\bdept\b|department|city of|state of|county|public|conservancy|orchestra|ballet|opera|zoo|botanic/i;
+function fromFeed(r,city,ref){ const j=fromFeed0(r,city,ref); j._mission=MISSION_ROLES.has(j.role)?5:(j.src==="nycgov"||j.src==="usajobs"||MISSION_ORG.test(j.company))?4.5:3; return j; }
+function fromFeed0(r,city,ref){
   const title=String(r.t||"").replace(/\s+/g," ").trim(), loc=r.l||"", dept=r.d||"", pp=parsePay(r.p||"");
   const n=COUNTS[r.c]||0, dref=r.o||r.f||"";
   return {id:r.i,src:r.s,company:r.c,mono:monoOf(r.c),title,loc,dept,pay:pp.text,_pay:pp.top,_payLo:pp.lo,equity:/equity/i.test(r.p||""),url:r.u,
@@ -579,7 +588,7 @@ function keywordsOf(text){
 }
 const KWC={};
 function kwSet(p){ const k=p.id+":"+(p.kw||[]).length; if(!KWC[k]) KWC[k]=new Set(p.kw||[]); return KWC[k]; }
-const ROLE_HINTS=[["corpdev",/m&a|mergers|acquisitions|investment bank/i],["finance",/financial model|fp&a|valuation|accounting|corporate finance|treasury/i],["investing",/private equity|venture|hedge fund|trading|portfolio|investment bank/i],["strategy",/strategy|consult|operations|chief of staff/i],["sales",/\bsales\b|quota|account executive|business development|client/i],["partnerships",/partnership|business development|relationship/i],["success",/customer success|account manag|client service/i],["engineering",/software|engineer|python|java\b|react|aws|kubernetes/i],["data",/\bsql\b|tableau|data analy|statistic|machine learning|pandas/i],["marketing",/marketing|brand|social media|content|campaign/i],["product",/product manag|roadmap|user stories/i],["design",/figma|\bux\b|\bui\b|graphic design/i],["legal",/\blaw\b|legal|j\.d\.|paralegal/i],["people",/recruit|human resources|talent acquisition/i],["ir",/investor relations|roadshow/i]];
+const ROLE_HINTS=[["arts",/ceramic|pottery|studio art|gallery|museum|curat|exhibition|illustrat|painting|sculpt|photograph|theat(er|re)|\bmusic|dance|\bfilm|\bbfa\b|\bmfa\b|portfolio of work/i],["education",/teacher|teaching assistant|taught|tutor|curriculum|classroom|lesson plan/i],["health",/patient|clinical|nursing|\brn\b|therap|counsel|healthcare|medical/i],["community",/nonprofit|non-profit|community|volunteer|outreach|fundrais|grant/i],["trades",/carpent|electric|plumb|welding|woodwork|fabricat|culinary|kitchen|chef|construction|landscap/i],["corpdev",/m&a|mergers|acquisitions|investment bank/i],["finance",/financial model|fp&a|valuation|accounting|corporate finance|treasury/i],["investing",/private equity|venture|hedge fund|trading|portfolio|investment bank/i],["strategy",/strategy|consult|operations|chief of staff/i],["sales",/\bsales\b|quota|account executive|business development|client/i],["partnerships",/partnership|business development|relationship/i],["success",/customer success|account manag|client service/i],["engineering",/software|engineer|python|java\b|react|aws|kubernetes/i],["data",/\bsql\b|tableau|data analy|statistic|machine learning|pandas/i],["marketing",/marketing|brand|social media|content|campaign/i],["product",/product manag|roadmap|user stories/i],["design",/figma|\bux\b|\bui\b|graphic design/i],["legal",/\blaw\b|legal|j\.d\.|paralegal/i],["people",/recruit|human resources|talent acquisition/i],["ir",/investor relations|roadshow/i]];
 function inferRoles(text){ return ROLE_HINTS.map(([k,re])=>[k,(String(text).match(new RegExp(re.source,"gi"))||[]).length]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>x[0]); }
 function guessExp(text){
   const M={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11,summer:5,spring:2,fall:8,autumn:8,winter:0};
@@ -616,6 +625,8 @@ function fetchDesc(j){
   const p=(async()=>{
     if(pre==="gh"){ const d=await getJSON(`https://boards-api.greenhouse.io/v1/boards/${enc(slug)}/jobs/${enc(id)}`); return htmlText(d.content||""); }
     if(pre==="lv"){ const d=await getJSON(`https://api.lever.co/v0/postings/${enc(slug)}/${enc(id)}`); return [d.descriptionPlain,...(d.lists||[]).map(l=>l.text+"\n"+htmlText(l.content||"")),d.additionalPlain].filter(Boolean).join("\n\n").trim(); }
+    if(pre==="wk"){ const d=await getJSON(`https://jobs.workable.com/api/v1/jobs/${enc(slug)}`); return [d.description,d.requirementsSection,d.benefitsSection].filter(Boolean).map(htmlText).join("\n\n").trim(); }
+    if(pre==="ny"){ const d=await getJSON(`https://data.cityofnewyork.us/resource/kpav-sd4t.json?job_id=${enc(slug)}&$limit=1`); const x=d[0]||{}; return [x.job_description,x.minimum_qual_requirements&&"Minimum qualifications:\n"+x.minimum_qual_requirements,x.preferred_skills&&"Preferred skills:\n"+x.preferred_skills,x.additional_information].filter(Boolean).join("\n\n").trim(); }
     if(pre==="ab"){ const d=await getJSON(`https://api.ashbyhq.com/posting-api/job-board/${enc(slug)}`); const x=(d.jobs||[]).find(y=>y.id===id); return x?(x.descriptionPlain||htmlText(x.descriptionHtml||"")).trim():""; }
     return "";
   })();
@@ -777,7 +788,7 @@ function renderList(p,city){
     <div class="grid">${shown.map(j=>cardHTML(j,p)).join("")}${!ready?Array.from({length:6}).map(()=>`<div class="skel" aria-hidden="true"></div>`).join(""):""}</div>
     ${vis.length>shown.length?`<div class="more"><button class="tbtn" id="more">Show ${Math.min(60,vis.length-shown.length)} more</button></div>`:""}
     ${ready&&!vis.length?`<div class="empty">No jobs match these filters and must-haves. Loosen a filter or edit your preferences.</div>`:""}
-    <p class="foot">Listings come from companies' own job boards on Greenhouse, Lever and Ashby, collected every 6 hours; Apply opens the employer's page. Match % is Minerva's estimate, worked out in your browser from your experience level, the role types you want, words on your resume and your ranked priorities. Pay, location, work setup and dates come from the posting when it lists them. Work-life balance, people-facing work and company size are rough guesses from the role type and how many jobs the company has open, not from the posting. Your resume and profile stay in this browser. <a href="feed.html">Raw job feed</a></p>`;
+    <p class="foot">Listings are collected every 6 hours from employers' job boards on Greenhouse, Lever, Ashby and Workable, and from New York City government postings. Fast-food and retail store jobs are left out. Match % is Minerva's estimate, worked out in your browser from your experience level, the role types you want, words on your resume and your ranked priorities. Pay, location, work setup and dates come from the posting when it lists them. Work-life balance, people-facing work and company size are rough guesses from the role type and how many jobs the company has open, not from the posting. Your resume and profile stay in this browser. <a href="feed.html">Raw job feed</a></p>`;
   const c=$("#count"); if(c) c.textContent=ready?`${vis.length.toLocaleString()} jobs`:"";
   const on=$("#obnow"); if(on) on.onclick=()=>startOnboard(p);
   const mine=$("#mine"); if(mine) mine.onclick=()=>startOnboard(null);
@@ -888,6 +899,7 @@ function reasons(j,p){
   if(j.pay){ if(p.minPay&&j._pay&&j._pay<p.minPay) watch.push(`The top of the listed range is below your $${p.minPay}K minimum.`); else why.push(`Pay is listed: ${j.pay}.`); } else watch.push("Pay isn't listed.");
   if(j.setup) why.push(`Listed as ${j.setup.toLowerCase()}.`);
   if(j.equity) why.push("The posting mentions equity.");
+  if((p.priorities||[]).includes("mission")&&j._mission>=4.5) why.push(j.src==="nycgov"||j.src==="usajobs"?"Public-service job.":`${ROLES[j.role]} work, or a mission-driven employer.`);
   if(!j.fulltime) watch.push("Looks part-time, contract, temporary or an internship.");
   if(j._dist!=null) (j._dist<=2?why:watch).push(`Roughly ${j._dist.toFixed(1)} mi from home, using the neighborhood in the posting.`);
   return {why,watch};
@@ -917,15 +929,15 @@ function renderDetail(p,city){
         <div class="sect"><h3>Location</h3><p>${esc(j.loc||"Not listed")}${j.area&&!/office not listed/.test(j.area)?` · <b>${esc(j.area)}</b>`:""}${j._dist!=null?` · about ${j._dist.toFixed(1)} mi from home, straight line`:""}</p></div>
         ${rs.why.length?`<div class="sect"><h3>Why it might fit</h3><ul class="blist">${rs.why.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
         ${rs.watch.length?`<div class="sect"><h3>Watch out for</h3><ul class="blist">${rs.watch.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
-        <div class="sect"><h3>About the role</h3><div class="desc" id="descbox"><span class="spin"></span> Loading the description from ${esc(j.company)}'s job board…</div><button class="mini" id="descmore" hidden>Show the full description</button></div>
+        <div class="sect"><h3>About the role</h3><div class="desc" id="descbox"><span class="spin"></span> Loading the description from the posting…</div><button class="mini" id="descmore" hidden>Show the full description</button></div>
         ${sim.length?`<div class="sect"><h3>Similar listings</h3><div class="similar">${sim.map(x=>cardHTML(x,p,true)).join("")}</div></div>`:""}
       </div>
       <div>
         <div class="apply">
           <div class="big">${m.pct}%</div><div class="est">Estimated match with your experience and priorities</div>
           ${rows.map(([k,l])=>`<div class="mbar"><span>${esc(l)}<span class="src">${esc(src[k]||"")}</span></span><span class="tr"><i style="width:${(m.a[k]??3)*20}%"></i></span><span class="w">${(m.a[k]??3).toFixed(1).replace(".0","")}/5</span></div>`).join("")}
-          <a class="btn" href="${esc(linkOf(j))}" target="_blank" rel="noopener">Apply on ${esc(j.company)}'s site ↗</a>
-          <p class="note">Opens the employer's own job page in a new tab.</p>
+          <a class="btn" href="${esc(linkOf(j))}" target="_blank" rel="noopener">${j.src==="nycgov"?"Apply on NYC Jobs ↗":j.src==="usajobs"?"Apply on USAJOBS ↗":j.src==="workable"?"View and apply ↗":`Apply on ${esc(j.company)}'s site ↗`}</a>
+          <p class="note">${j.src==="nycgov"?"Opens the posting on the City of New York's job site.":j.src==="usajobs"?"Opens the posting on the federal government's job site.":j.src==="workable"?"Opens the posting on Workable, the hiring system this employer uses.":"Opens the employer's own job page in a new tab."}</p>
         </div>
         ${trackHTML(p,j)}
       </div>
@@ -942,7 +954,7 @@ function renderDetail(p,city){
   const key=jkey(j);
   fetchDesc(j).then(t=>{
     if(UI.detail!==key) return; const box=$("#descbox"), ry=$("#reqy"); if(!box) return;
-    if(!t){ box.textContent="The job board didn't return a description. Open the posting to read it."; if(ry) ry.textContent="—"; return; }
+    if(!t){ box.textContent=j.src==="usajobs"?"Federal postings can't be loaded here. Open the posting to read it.":"The job board didn't return a description. Open the posting to read it."; if(ry) ry.textContent="—"; return; }
     if(ry) ry.textContent=reqYears(t)||"Not stated";
     const short=t.length>1400; box.textContent=short?t.slice(0,1400).replace(/\s+\S*$/,"")+" …":t;
     const mb=$("#descmore"); if(short&&mb){ mb.hidden=false; mb.onclick=()=>{ box.textContent=t; mb.hidden=true; }; }
