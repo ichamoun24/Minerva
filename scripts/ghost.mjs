@@ -4,7 +4,7 @@
 // Signals:
 //   pl   the text says it is a pipeline, talent pool or future-opening posting
 //   gt   the title itself is a general application / talent community / expression of interest
-//   a60  open 60+ days            a120  open 120+ days (most real roles fill in 30–45)
+//   a90  open 90+ days            a180  open 180+ days (most real roles fill in 30–45)
 //   rp   the same company has reposted the same title in the same city under a new id (rp2, rp3… = times)
 //   mass the company has 15+ open postings with this exact title
 //
@@ -74,7 +74,7 @@ export function scan(jobs, prevHistory, today, cityOf = () => "") {
     const starts = [j.o, j.f].filter(Boolean).map(dayNum); if (v) starts.push(v[0]);
     // Government postings often stay open by law ("continuous recruitment"), so time open isn't held against them.
     const age = starts.length && !/^(nycgov|usajobs)$/.test(j.s) ? T - Math.min(...starts) : 0;
-    if (age >= 120) { reasons.push("a120"); score += 2; } else if (age >= 60) { reasons.push("a60"); score += 1; }
+    if (age >= 180) { reasons.push("a180"); score += 2; } else if (age >= 90) { reasons.push("a90"); score += 1; }
     if (v && v[2] >= 2) { reasons.push("rp" + v[2]); score += v[2] >= 3 ? 2 : 1; }
     if ((titleCount.get(normCo(j.c) + "|" + normTitle(j.t)) || 0) >= 15) { reasons.push("mass"); score += 1; }
     delete j._rk; delete j.gp;

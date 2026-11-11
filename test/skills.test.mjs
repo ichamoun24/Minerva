@@ -64,7 +64,7 @@ const city = () => "nyc";
 let js = jobs(); let hist = scan(js, {}, today, city);
 const by = id => js.find(j => j.i === id);
 assert.equal(by("gh:a:1").g, undefined, "fresh posting is fine");
-assert.equal(by("gh:a:2").g, 1); assert.equal(by("gh:a:2").gr, "a120");
+assert.equal(by("gh:a:2").g, 1); assert.equal(by("gh:a:2").gr, "a180");
 assert.equal(by("gh:a:3").g, 2, "general-application title");
 assert.equal(by("ny:9").g, undefined, "government postings are not penalized for time open");
 assert.equal(by("gh:a:4").g, 2); assert.equal(by("gh:a:4").gp, undefined, "gp dropped after scan");
@@ -80,10 +80,14 @@ assert.equal(by("gh:a:100").g, 1); assert.equal(by("gh:a:100").gr, "rp3", "third
 // a long-lived role that keeps getting reposted: time open counts from the first sighting
 js = [{ i: "gh:z:1", s: "greenhouse", c: "Zed", t: "Analyst", l: "NYC", o: "2026-11-01" }];
 let h2 = scan(js, {}, "2026-06-01", city); js = [{ ...js[0], i: "gh:z:2", o: "2026-11-01" }]; scan(js, h2, "2026-11-11", city);
-assert.equal(js[0].gr, "a120,rp2"); assert.equal(js[0].g, 2);
+assert.equal(js[0].gr, "a90,rp2"); assert.equal(js[0].g, 1);
 
 // 15+ identical postings
 js = Array.from({ length: 16 }, (_, n) => ({ i: "gh:b:" + n, s: "greenhouse", c: "Big", t: "Sales Rep", l: "City " + n, o: "2026-08-01" }));
 scan(js, {}, today, () => "");
-assert.equal(js[0].gr, "a60,mass");
+assert.equal(js[0].gr, "a90,mass");
 console.log("✓ ghost-job scan");
+// boilerplate and look-alike words are not requirements
+r = requirementsOf("We are an equal opportunity employer and comply with all laws; our recruiting team reviews every application. Salary is negotiable. Attention to accurate data.");
+assert.equal(r.sk, undefined, "boilerplate, 'negotiable' and 'accurate' don't count");
+console.log("✓ boilerplate ignored");

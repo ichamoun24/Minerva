@@ -77,7 +77,7 @@ export const SKILLS = [
   ["b2b", "B2B / SaaS sales", "Sales and CRM", String.raw`\bb2b\b|\bsaas\b`],
   ["prospect", "Prospecting / cold outreach", "Sales and CRM", String.raw`prospecting|cold (call|email|outreach)|outbound`],
   ["quota", "Quota-carrying sales", "Sales and CRM", String.raw`\bquota\b`],
-  ["negot", "Negotiation", "Sales and CRM", String.raw`\bnegotiat`],
+  ["negot", "Negotiation", "Sales and CRM", String.raw`\bnegotiat(e|es|ion|ions|ing)\b`],
   ["acctmgmt", "Account management", "Sales and CRM", String.raw`account management|client relationship|relationship management`],
   ["cs", "Customer success / support", "Sales and CRM", String.raw`customer success|customer support|zendesk|intercom`],
   ["seo", "SEO / SEM", "Marketing", String.raw`\bseo\b|\bsem\b|search engine optimi`],
@@ -88,14 +88,14 @@ export const SKILLS = [
   ["events", "Event planning", "Marketing", String.raw`event (planning|management|production)`],
   ["pr", "Public relations", "Marketing", String.raw`public relations|media relations|press release`],
   // people, legal, operations
-  ["recruit", "Recruiting", "People", String.raw`\brecruiting\b|talent acquisition|sourcing candidates`],
+  ["recruit", "Recruiting", "People", String.raw`full[- ]cycle recruit|(experience|background) (in|with) (recruiting|talent acquisition)|recruiting experience|talent acquisition experience|sourcing candidates`],
   ["hris", "HRIS", "People", String.raw`\bhris\b|bamboohr|greenhouse ats|\bats\b`],
   ["contracts", "Contracts", "Legal", String.raw`contract (drafting|review|negotiation|management)`],
-  ["compliance", "Compliance", "Legal", String.raw`\bcompliance\b|\baml\b|\bkyc\b`],
-  ["supply", "Supply chain / logistics", "Operations", String.raw`supply chain|logistics|procurement|inventory management`],
+  ["compliance", "Compliance", "Legal", String.raw`(regulatory|compliance) (experience|background|knowledge|programs?|frameworks?|monitoring|testing)|experience (in|with) (regulatory )?compliance|\baml\b|\bkyc\b|anti[- ]money laundering`],
+  ["supply", "Supply chain / logistics", "Operations", String.raw`supply chain (management|planning|operations|experience)|experience (in|with) (supply chain|logistics|procurement)|logistics (experience|management|coordination)|inventory management`],
   // healthcare and care work
   ["emr", "EMR / EHR (e.g. Epic)", "Healthcare", String.raw`\bemr\b|\behr\b|\bepic\b(?! (journey|story|games))|electronic (medical|health) record`],
-  ["bls", "BLS / CPR", "Healthcare", String.raw`\bbls\b|\bcpr\b|basic life support`],
+  ["bls", "BLS / CPR", "Healthcare", String.raw`\b(bls|cpr|basic life support)\b[^.]{0,40}(certif|card|required)|(certif|current|valid|active)[^.]{0,30}\b(bls|cpr|basic life support)\b`],
   ["hipaa", "HIPAA", "Healthcare", String.raw`\bhipaa\b`],
   ["aba", "ABA therapy", "Healthcare", String.raw`\baba\b|applied behavior analysis`],
   ["casemgmt", "Case management", "Community", String.raw`case management|case manager|caseload`],
@@ -122,7 +122,7 @@ export const SKILLS = [
   // arts and culture
   ["ceramics", "Ceramics / pottery", "Arts", String.raw`ceramic|pottery|wheel[- ]throwing|glaz(e|ing)\b|\bkiln`],
   ["arthandling", "Art handling", "Arts", String.raw`art handling|art handler|installation of (art|exhibitions)`],
-  ["exhibit", "Exhibitions / curation", "Arts", String.raw`exhibition|curat(e|ion|orial)`],
+  ["exhibit", "Exhibitions / curation", "Arts", String.raw`\bexhibitions?\b|\bcurat(e|ion|orial|or|ing)\b`],
   ["collections", "Collections / archives", "Arts", String.raw`collections management|archiv(e|ist|al)|registrar`],
   ["photo", "Photography", "Arts", String.raw`photograph`],
   ["music", "Music", "Arts", String.raw`\bmusic(al|ian)?\b|pro tools|ableton`],
@@ -170,6 +170,8 @@ const SKILL_RE = SKILLS.map(([id, , , re]) => [id, C(re)]);
 const LIC_RE = LICENSES.map(([id, , re]) => [id, C(re)]);
 const DEG_RE = DEG.map(([n, re]) => [n, C(re)]);
 const PREF = /\b(prefer|preferred|nice to have|a plus|is a bonus|bonus points|ideally|desired|desirable)\b/i;
+// Company boilerplate (equal opportunity, benefits, privacy) mentions words like "compliance" and "recruiting" that aren't requirements.
+const BOILER = /equal (employment )?opportunity|\beeo\b|reasonable accommodation|without regard to|regardless of|e-verify|background check|privacy (notice|policy)|pay transparency|our benefits|benefits (include|package)|401\(?k|we are committed|recruiting (team|process|agenc)|recruitment fraud|scam/i;
 
 function sentences(t) { return t.split(/(?<=[.!?;])\s+|\n+/).map(s => s.trim()).filter(Boolean); }
 
@@ -182,7 +184,7 @@ export function requirementsOf(raw) {
   for (const s of sentences(t)) {
     if (s.length < 70 && /\b(preferred|nice[- ]to[- ]have|bonus|pluses|desired)\b/i.test(s) && !/required|minimum/i.test(s)) { prefSection = true; continue; }
     if (s.length < 70 && /\b(required|requirements|minimum|basic qualifications|what you('ll)? (need|bring)|you have|must have|qualifications)\b/i.test(s)) prefSection = false;
-    const pref = prefSection || PREF.test(s);
+    const pref = prefSection || PREF.test(s) || BOILER.test(s);
     if (!pref) {
       for (const [id, re] of SKILL_RE) if (re.test(s)) req.add(id);
       for (const [id, re] of LIC_RE) if (re.test(s)) lic.add(id);
