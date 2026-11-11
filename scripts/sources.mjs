@@ -4,7 +4,9 @@
 //   workable  Workable's public cross-company job search (jobs.workable.com), searched by city
 //   nycgov    New York City government postings (NYC Open Data, updated daily)
 //   usajobs   Federal jobs (needs a free key: set USAJOBS_KEY and USAJOBS_EMAIL as repo secrets)
+import { reqYearsOf } from "./years.mjs";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const yrs = (...parts) => { const n = reqYearsOf(parts.filter(Boolean).join("\n")); return n ? { y: n } : {}; };
 
 const WORKABLE_CITIES = { nyc: "New York", sf: "San Francisco", boston: "Boston", seattle: "Seattle", austin: "Austin", la: "Los Angeles", chicago: "Chicago", dc: "Washington", denver: "Denver", miami: "Miami" };
 const WK_MAX_PAGES = Number(process.env.WK_MAX_PAGES || 400);   // 20 jobs a page
@@ -38,7 +40,7 @@ export function fromWorkable(j) {
   return {
     i: `wk:${j.id}`, s: "workable", c: j.company?.title || "", t: j.title || "",
     l: locs + (j.workplace === "remote" && !/remote|telecommute/i.test(locs) ? "; Remote" : j.workplace === "hybrid" && !/hybrid/i.test(locs) ? " (Hybrid)" : ""),
-    d: j.department || "", p: "", u: j.url || "", o: isoDay(j.created), k: j.employmentType || "", w: host(j.company?.website),
+    d: j.department || "", p: "", u: j.url || "", o: isoDay(j.created), k: j.employmentType || "", w: host(j.company?.website), ...yrs(j.requirementsSection, j.description),
   };
 }
 async function workableCity(city, q, log) {
@@ -64,11 +66,11 @@ export function fromNycGov(r) {
     i: `ny:${r.job_id}`, s: "nycgov", c: smartCase(r.agency), t: smartCase(r.business_title || r.civil_service_title),
     l: [r.work_location, "New York City"].filter(Boolean).join(" · "), d: r.job_category || "",
     p: pay(r.salary_range_from, r.salary_range_to, per), u: `https://cityjobs.nyc.gov/job/${r.job_id}`,
-    o: isoDay(r.posting_date), k: r.full_time_part_time_indicator === "P" ? "Part-time" : r.full_time_part_time_indicator === "F" ? "Full-time" : "",
+    o: isoDay(r.posting_date), k: r.full_time_part_time_indicator === "P" ? "Part-time" : r.full_time_part_time_indicator === "F" ? "Full-time" : "", ...yrs(r.minimum_qual_requirements),
   };
 }
 export async function nycGovJobs(log = console.log) {
-  const sel = "job_id,agency,business_title,civil_service_title,job_category,full_time_part_time_indicator,salary_range_from,salary_range_to,salary_frequency,work_location,posting_date";
+  const sel = "job_id,agency,business_title,civil_service_title,job_category,full_time_part_time_indicator,salary_range_from,salary_range_to,salary_frequency,work_location,posting_date,minimum_qual_requirements";
   const r = await getJSON(`https://data.cityofnewyork.us/resource/kpav-sd4t.json?$select=${sel}&$where=posting_type='External'&$limit=10000`);
   if (!r.ok) { log(`  nycgov: failed (HTTP ${r.status})`); return []; }
   const seen = new Set(), out = [];
@@ -83,7 +85,7 @@ export function fromUsaJobs(m) {
     i: `us:${m.PositionID || m.PositionURI}`, s: "usajobs", c: m.OrganizationName || m.DepartmentName || "", t: m.PositionTitle || "",
     l: m.PositionLocationDisplay || (m.PositionLocation || []).map(x => x.LocationName).join("; "), d: m.DepartmentName || "",
     p: pay(rem.MinimumRange, rem.MaximumRange, per), u: m.PositionURI || "", o: isoDay(m.PublicationStartDate),
-    k: ((m.PositionSchedule || [])[0] || {}).Name || "",
+    k: ((m.PositionSchedule || [])[0] || {}).Name || "", ...yrs(m.QualificationSummary),
   };
 }
 export async function usaJobs(log = console.log) {

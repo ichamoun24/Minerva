@@ -7,6 +7,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { workableJobs, nycGovJobs, usaJobs, isRetailOrFastFood } from "./sources.mjs";
+import { reqYearsOf } from "./years.mjs";
+const yrs = (...parts) => { const n = reqYearsOf(parts.filter(Boolean).join("\n")); return n ? { y: n } : {}; };
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const BOARDS = path.join(ROOT, "data", "boards.json");
@@ -71,7 +73,7 @@ export function fromGreenhouse(slug, data, boardName) {
       l: loc, d: (j.departments || []).map(d => d.name).join(", "),
       p: pr ? money(Math.round(pr.min_cents / 100), Math.round(pr.max_cents / 100), pr.currency_type) : "",
       u: j.absolute_url || `https://boards.greenhouse.io/${slug}/jobs/${j.id}`,
-      o: isoDay(j.first_published || j.updated_at),
+      o: isoDay(j.first_published || j.updated_at), ...yrs(j.content),
     };
   });
 }
@@ -84,7 +86,7 @@ export function fromLever(slug, data) {
       i: `lv:${slug}:${j.id}`, s: "lever", c: titleCase(slug), t: j.text || "",
       l: locs + (j.workplaceType === "remote" && !/remote/i.test(locs) ? "; Remote" : ""), d: [cat.department, cat.team].filter(Boolean).join(", "),
       p: money(sr.min, sr.max, sr.currency, sr.interval), u: j.hostedUrl || j.applyUrl || "",
-      o: isoDay(j.createdAt), k: cat.commitment || "",
+      o: isoDay(j.createdAt), k: cat.commitment || "", ...yrs(j.descriptionPlain, ...(j.lists || []).map(l => l.text + "\n" + (l.content || "")), j.additionalPlain),
     };
   });
 }
@@ -95,14 +97,14 @@ export function fromAshby(slug, data) {
       i: `ab:${slug}:${j.id}`, s: "ashby", c: titleCase(slug), t: j.title || "",
       l: locs + (j.isRemote && !/remote/i.test(locs) ? "; Remote" : ""), d: [j.department, j.team].filter(Boolean).join(", "),
       p: j.compensation?.compensationTierSummary || j.compensation?.scrapeableCompensationSalarySummary || "",
-      u: j.jobUrl || j.applyUrl || "", o: isoDay(j.publishedAt), k: j.employmentType || "",
+      u: j.jobUrl || j.applyUrl || "", o: isoDay(j.publishedAt), k: j.employmentType || "", ...yrs(j.descriptionPlain || j.descriptionHtml),
     };
   });
 }
 
 async function readBoard(ats, slug) {
   if (ats === "greenhouse") {
-    const r = await getJSON(`https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?pay_transparency=true`);
+    const r = await getJSON(`https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?pay_transparency=true&content=true`);
     if (!r.ok) return r;
     let name = "";
     if ((r.data.jobs || []).length) { const b = await getJSON(`https://boards-api.greenhouse.io/v1/boards/${slug}`); name = b.ok ? b.data.name : ""; }

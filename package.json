@@ -6,7 +6,7 @@
   "scripts": {
     "discover": "node scripts/discover.mjs",
     "fetch": "node scripts/fetch.mjs",
-    "test": "node test/run.mjs"
+    "test": "node test/years.test.mjs && node test/run.mjs"
   },
   "engines": { "node": ">=20" }
 }
