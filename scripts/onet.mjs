@@ -83,7 +83,7 @@ export async function build(dir, version = "") {
   if (jz) { const c = col(jz, /soc code/i), z = col(jz, /job zone/i); for (const r of jz.rows) if (idx.has(r[c])) occ[idx.get(r[c])].zone = +r[z] || 0; }
 
   // Education and experience: newer releases split this file, so read every table that has RL/RW scale rows.
-  console.log("  files: " + files.map(f => path.basename(f)).filter(n => /educ|train|experience|zone|technology/i.test(n)).join(" | "));
+  console.log("  files: " + files.map(f => path.basename(f)).join(" | "));
   const eteFiles = files.filter(f => /educ|train|experience/i.test(path.basename(f)) && !/categor/i.test(path.basename(f)));
   for (const f of eteFiles) {
     const ete = await table([f], /./);
@@ -99,7 +99,7 @@ export async function build(dir, version = "") {
     console.log(`  ${ete.file}: education/experience rows read`);
   }
 
-  const tech = await table(files, /^technology skills\.txt$/i);
+  const tech = await table(files, /^(technology|software|tools).*\.txt$/i);
   if (tech) {
     const c = col(tech, /soc code/i), e = col(tech, /^example$/i), hot = col(tech, /hot technology/i), dem = col(tech, /in demand/i);
     const pick = new Map();

@@ -72,7 +72,11 @@ jobs:
           git config user.name "jobs-bot"
           git config user.email "jobs-bot@users.noreply.github.com"
           git add data/boards.json data/onet.json data/onet-titles.json 2>/dev/null || git add data/boards.json
-          git diff --cached --quiet || (git commit -m "Update job board list and hiring baseline [skip ci]" && git push) || true
+          if ! git diff --cached --quiet; then
+            git commit -m "Update job board list and hiring baseline [skip ci]"
+            # main may have moved while this run was going; replay on top and retry
+            for i in 1 2 3; do git pull --rebase -X theirs origin main && git push && break; sleep 5; done
+          fi
 
       - uses: actions/upload-pages-artifact@v3
         with:
