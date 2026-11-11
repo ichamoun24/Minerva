@@ -36,16 +36,53 @@ function clean(s) {
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function getText(url, tries = 4) {
+const problems = {};
+// Fetches text with a timeout and backoff. Busy servers (429/503) get longer pauses.
+// Failures are counted and printed so the Actions log shows why a source came back empty.
+async function getText(url, tries = 5, timeoutMs = 90000) {
   for (let i = 0; i < tries; i++) {
+    let why;
     try {
-      const r = await fetch(url, { headers: { "user-agent": UA } });
+      const r = await fetch(url, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(timeoutMs) });
       if (r.ok) return await r.text();
       if (r.status === 404) return "";
-    } catch {}
-    await sleep(1500 * (i + 1));
+      why = "HTTP " + r.status;
+      await sleep((r.status === 429 || r.status === 503 ? 15000 : 2000) * (i + 1));
+    } catch (e) {
+      why = e.name === "TimeoutError" ? "timeout" : (e.cause?.code || e.message);
+      await sleep(3000 * (i + 1));
+    }
+    const host = new URL(url).host;
+    problems[host] = problems[host] || {};
+    problems[host][why] = (problems[host][why] || 0) + 1;
   }
   return "";
+}
+function reportProblems() {
+  for (const [host, m] of Object.entries(problems))
+    console.log(`  ${host} errors: ` + Object.entries(m).map(([k, v]) => `${k} x${v}`).join(", "));
+}
+
+// Internet Archive (Wayback Machine) URL index: a second public list of career-page URLs.
+// One request per first character, so a few big companies can't use up the whole budget.
+const WB_LIMIT = Number(process.env.WB_LIMIT || 25000);
+async function fromWayback(found) {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789".split("");
+  for (const p of PATTERNS) {
+    const host = p.url.replace("/*", "");
+    let added = 0, empty = 0;
+    for (const ch of chars) {
+      const url = `https://web.archive.org/cdx/search/cdx?url=${host}/${ch}&matchType=prefix&fl=original&collapse=urlkey&filter=statuscode:200&limit=${WB_LIMIT}`;
+      const body = await getText(url, 3, 120000);
+      if (!body) empty++;
+      for (const line of body.split("\n")) {
+        const s = line && slugFromUrl(p.ats, line.trim());
+        if (s && !found[p.ats].has(s)) { found[p.ats].add(s); added++; }
+      }
+      await sleep(1500); // the archive asks for a gentle pace
+    }
+    console.log(`Wayback ${host}: +${added} boards (${empty}/${chars.length} requests empty)`);
+  }
 }
 
 async function fromCommonCrawl(found) {
@@ -56,8 +93,9 @@ async function fromCommonCrawl(found) {
     for (const p of PATTERNS) {
       const base = `${c["cdx-api"]}?url=${encodeURIComponent(p.url)}&output=json&fl=url&filter=status:200`;
       const meta = await getText(base + "&showNumPages=true");
+      if (!meta) { console.log(`${c.id} ${p.url}: no answer from the index`); continue; }
       let pages = 1;
-      try { pages = JSON.parse(meta).pages || 1; } catch {}
+      try { pages = JSON.parse(meta).pages || 1; } catch { console.log(`  unexpected reply: ${meta.slice(0, 120)}`); }
       pages = Math.min(pages, MAX_PAGES);
       let added = 0;
       for (let pg = 0; pg < pages; pg++) {
@@ -92,7 +130,15 @@ export async function loadSeeds() {
 
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) {
   const found = await loadSeeds();
-  if (process.env.SKIP_CRAWL !== "1") await fromCommonCrawl(found);
+  const before = Object.values(found).reduce((n, x) => n + x.size, 0);
+  if (process.env.SKIP_CRAWL !== "1") {
+    console.log("Common Crawl:");
+    await fromCommonCrawl(found);
+    if (process.env.SKIP_WAYBACK !== "1") { console.log("Internet Archive:"); await fromWayback(found); }
+    reportProblems();
+  }
+  const after = Object.values(found).reduce((n, x) => n + x.size, 0);
+  console.log(`New boards found this run: ${after - before}`);
   let dead = {};
   try { dead = JSON.parse(await fs.readFile(OUT, "utf8")).dead || {}; } catch {}
   const out = { updatedAt: new Date().toISOString(), dead };
