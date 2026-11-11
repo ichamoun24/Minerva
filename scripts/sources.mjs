@@ -32,12 +32,13 @@ async function getJSON(url, headers = {}, tries = 3) {
   return { ok: false, status: 0 };
 }
 
+const host = u => { try { return new URL(/^https?:/.test(u) ? u : "https://" + u).hostname.replace(/^www\./, ""); } catch { return ""; } };
 export function fromWorkable(j) {
   const locs = (j.locations || []).length ? j.locations.join("; ") : [j.location?.city, j.location?.subregion, j.location?.countryName].filter(Boolean).join(", ");
   return {
     i: `wk:${j.id}`, s: "workable", c: j.company?.title || "", t: j.title || "",
     l: locs + (j.workplace === "remote" && !/remote|telecommute/i.test(locs) ? "; Remote" : j.workplace === "hybrid" && !/hybrid/i.test(locs) ? " (Hybrid)" : ""),
-    d: j.department || "", p: "", u: j.url || "", o: isoDay(j.created), k: j.employmentType || "",
+    d: j.department || "", p: "", u: j.url || "", o: isoDay(j.created), k: j.employmentType || "", w: host(j.company?.website),
   };
 }
 async function workableCity(city, q, log) {

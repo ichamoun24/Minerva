@@ -320,7 +320,8 @@ const FEED_BASE=window.MINERVA_FEED||"data/";
 const CITY_LIST=[["nyc","New York","New York, NY"],["sf","San Francisco Bay Area","San Francisco, CA"],["remote","Remote","Remote"],["boston","Boston","Boston, MA"],["seattle","Seattle","Seattle, WA"],["austin","Austin","Austin, TX"],["la","Los Angeles","Los Angeles, CA"],["chicago","Chicago","Chicago, IL"],["dc","Washington, DC","Washington, DC"],["denver","Denver / Boulder","Denver, CO"],["miami","Miami","Miami, FL"]];
 const CITY=Object.fromEntries(CITY_LIST.map(([k,n,l])=>[k,{name:n,loc:l,area:n}]));
 const hasMap=c=>!!GEO[c];
-const CATS={large:"Big company",growing:"Growing company",small:"Small team"};
+const CATS={large:"Large employer",growing:"Growing employer",small:"Small employer"};
+const ORGS={company:"Company",nonprofit:"Nonprofit",education:"School or university",public:"Government"};
 const CAT_NOTE={large:"300+ open roles in the feed",growing:"50–299 open roles in the feed",small:"under 50 open roles in the feed"};
 const CAT_COLOR={large:"large",growing:"late",small:"early"};
 const ROLES={arts:"Arts & culture",education:"Education & teaching",health:"Healthcare & care",community:"Nonprofit & community",trades:"Skilled trades & culinary",sales:"Sales",partnerships:"Partnerships & BD",success:"Account mgmt & customer success",strategy:"Strategy & operations",corpdev:"Corp dev & M&A",ir:"Investor relations",finance:"Finance & accounting",investing:"Investing & trading",marketing:"Marketing & comms",product:"Product",design:"Design",engineering:"Engineering",data:"Data & analytics",people:"People & recruiting",legal:"Legal & policy",other:"Other"};
@@ -330,7 +331,7 @@ const PRI={
   balance:["Work-life balance","Reasonable hours (a rough guess by role type)"],
   pay:["Pay","Highest listed salary"],
   people:["People-facing work","Clients, partners and teams over spreadsheets"],
-  mission:["Mission & impact","Arts, education, care, nonprofit and public-service work (judged from the role and employer)"],
+  mission:["Mission & impact","Nonprofits, schools, government, and arts, teaching and care work"],
   growth:["Growth & learning","Smaller, fast-moving teams"],
   brand:["Big company","Large, established employers"],
   commute:["Short commute","Close to home, when the posting names a neighborhood"],
@@ -439,7 +440,7 @@ function matchOf(j,p){
   return {pct:Math.max(1,Math.min(99,Math.round(40+60*(sum/max-.2)/.8))), a, W};
 }
 const SRC=j=>({fit:"your level, role interests and resume words vs. the title",balance:"rough guess by role type and company size",pay:j.pay?"from the posting":"not listed",people:"by role type",growth:"by company hiring volume",brand:"by company hiring volume",
-  commute:j._dist!=null?"from the neighborhood in the posting":"office location not listed",flex:j.setup?"from the posting":"not stated in the listing",mission:"rough guess from the role type and employer name",equity:j.equity?"from the posting":"guess by company size",size:"your company-size preference"});
+  commute:j._dist!=null?"from the neighborhood in the posting":"office location not listed",flex:j.setup?"from the posting":"not stated in the listing",mission:"by employer type (nonprofit, school, government) and role",equity:j.equity?"from the posting":"guess by company size",size:"your company-size preference"});
 
 /* ---------- resume reading ---------- */
 async function readFile(f){
@@ -520,9 +521,11 @@ const ROLE_RULES=[
   ["engineering",R("engineer|engineering|developer|software|technical staff|\\bsre\\b|devops|infrastructure|architect|machine learning|\\bml\\b|security|systems admin|\\bit (support|specialist|manager|admin)|\\bqa\\b|quality assurance|firmware|hardware|robotics")],
   ["product",R("product (manager|owner|lead|director|management|ops|operations)|head of product|vp,? product|technical program manager")],
   ["arts",R("\\b(artist|\\barts\\b|public art|fine art|art (project|program|production|studio|department|fair)|art (director|teacher|handler|instructor|educator)|curator|curatorial|museum|gallery|galleries|ceramic|pottery|potter|sculpt|painter|illustrat|photograph|videograph|filmmak|film|animator|musician|music|theat(er|re)|\\bdance|dancer|choreograph|stage manager|costume|exhibition|archivist|conservator|registrar|docent|teaching artist|tattoo|jewel|glass ?blow|printmak|craft)")],
-  ["education",R("teacher|teaching|tutor|instructor|professor|lecturer|educator|paraprofessional|\\bschool\\b|curriculum|literacy|early childhood|preschool|childcare|child care|admissions|academic|librarian|\\bcoach\\b")],
+  ["education",R("teacher|teaching|tutor|professor|lecturer|paraprofessional|\\bschool\\b|curriculum|literacy|early childhood|preschool|childcare|child care|librarian|head start")],
+  ["education?",R("instructor|educator|academic|admissions|\\bcoach\\b|learning specialist")],
   ["health",R("\\bnurse|\\brn\\b|\\blpn\\b|nursing|physician|\\bdoctor|medical|clinic|clinical|therapist|therapy|psycholog|psychiatr|counselor|social worker|lcsw|case manager|behavior technician|\\brbt\\b|bcba|dental|dentist|hygienist|pharmac|veterinar|vet tech|caregiver|home health|patient|health aide|phlebotom|radiolog|optometr|dietitian|nutritionist|midwife|doula|occupational|speech")],
-  ["community",R("program (coordinator|associate|assistant|manager|director|specialist)|community|outreach|advocate|organizer|volunteer|(?<!business )development (associate|officer|director|coordinator|manager)|\\bgrants?\\b|fundrais|philanthrop|donor|youth|caseworker|case worker|housing|food bank|nonprofit|social services|eligibility|resident services|ranger|parks")],
+  ["community",R("fundrais|philanthrop|grant ?writ|grants (manager|coordinator|officer|associate|specialist)|caseworker|case worker|social services|eligibility (worker|specialist)|resident services|food bank|youth (worker|counselor|program|development)|housing (specialist|coordinator|advocate|counselor|navigator)|tenant organizer|community organizer|community health worker")],
+  ["community?",R("program (coordinator|associate|assistant|manager|director|specialist)|community|outreach|advocate|organizer|volunteer|(?<!business |software |product |web |app )development (associate|officer|director|coordinator|manager)|\\bgrants?\\b|youth|housing|nonprofit|ranger|\\bparks\\b|engagement")],
   ["trades",R("carpenter|electrician|plumber|hvac|welder|machinist|mechanic|technician|fabricat|woodwork|furniture|upholster|mason|construction|foreman|superintendent|installer|maintenance|facilities|landscap|gardener|horticultur|arborist|\\bchef\\b|sous chef|pastry|baker|butcher|culinary|brewer|tailor|seamstress|locksmith|surveyor|estimator|custodian|carpentry")],
   ["marketing",R("marketing|brand|growth|content|communications|\\bcomms\\b|\\bpr\\b|public relations|social media|copywriter|\\bseo\\b|demand gen|\\bevents?\\b|community|creative|editor|writer|journalist|producer|media|influencer")],
   ["partnerships",R("partnership|partner (manager|development|success|lead)|business development|\\bbd\\b|alliances|channel|ecosystem|licensing")],
@@ -530,10 +533,29 @@ const ROLE_RULES=[
   ["sales",R("\\bsales\\b|account executive|\\bae\\b|\\bsdr\\b|\\bbdr\\b|development rep|seller|revenue|go-to-market|\\bgtm\\b|enterprise (account|solutions)|territory|commercial|inside sales|deal desk")],
   ["strategy",R("strateg|operations|\\bops\\b|chief of staff|bizops|business operations|program manager|project manager|founder|operating|planning|general manager|consult")]
 ];
-function roleOf(title,dept){
-  for(const [k,re] of ROLE_RULES) if(re.test(title)) return k;
-  if(dept) for(const [k,re] of ROLE_RULES) if(re.test(dept)) return k;
-  return "other";
+// Rules ending in "?" only count at nonprofits, schools and government: "Community Manager" at a
+// software company is marketing, while the same title at a food bank is community work.
+function roleOf(title,dept,org){
+  const mission=org&&org!=="company";
+  const pick=t=>{ for(const [k,re] of ROLE_RULES){ if(k.endsWith("?")&&!mission) continue; if(re.test(t)) return k.replace("?",""); } return ""; };
+  return pick(title)||(dept&&pick(dept))||"other";
+}
+const ORG_NAME_EDU=/\b(school|schools|academy|charter|universit(y|ies)|college|institute of technology|head start|montessori|yeshiva|preparatory|prep\b)/i;
+const ORG_NAME_NONPROFIT=/\b(foundation|museum|library|hospital|health system|medical center|society|association|council|alliance|coalition|conservancy|ymca|ywca|church|ministr(y|ies)|friends of|nonprofit|non-profit|charit(y|ies)|league|theat(er|re)|orchestra|ballet|opera|philharmonic|zoo|botanical|aquarium|habitat for humanity|united way|boys & girls|big brothers|food bank|legal aid|tutorial program|settlement house|center for|centre for|fund for|trust for|conservation|historical|arts council|public radio|public media)\b/i;
+const ORG_COMPANY=/\b(llc|l\.l\.c|inc|incorporated|corp|corporation|co\.|company|partners|group|holdings|capital|ventures|technologies|labs|associates|consulting|ltd|plc|gmbh)\b/i;
+// What kind of employer: the website's ending decides when we have it (.org, .edu, .gov vs .com),
+// otherwise words in the name. Government sources are always public sector.
+function orgOf(company,src,web){
+  if(src==="nycgov"||src==="usajobs") return "public";
+  const w=String(web||"").toLowerCase().replace(/\/.*$/,"");
+  if(/\.(gov|mil)$|\.gov\.[a-z]{2}$|\.nyc$/.test(w)) return "public";
+  if(/\.edu$|\.k12\.[a-z]{2}\.us$/.test(w)) return "education";
+  if(/\.org$/.test(w)) return ORG_NAME_EDU.test(company)?"education":"nonprofit";
+  if(w) return "company";
+  if(ORG_COMPANY.test(company)) return "company";
+  if(ORG_NAME_EDU.test(company)) return "education";
+  if(ORG_NAME_NONPROFIT.test(company)) return "nonprofit";
+  return "company";
 }
 function levelOf(title){
   const t=title.toLowerCase();
@@ -567,16 +589,15 @@ function areaOf(loc,city){
 }
 const areaXY=(city,name)=>(GEO[city]&&(GEO[city].cent[name]||(AREA_XY[city]||{})[name]))||null;
 const MISSION_ROLES=new Set(["arts","education","health","community"]);
-const MISSION_ORG=/foundation|museum|school|academy|universit|college|hospital|health|nonprofit|charit|library|theat|institute|society|council|alliance|\bfund\b|\btrust\b|center|centre|\bdept\b|department|city of|state of|county|public|conservancy|orchestra|ballet|opera|zoo|botanic/i;
-function fromFeed(r,city,ref){ const j=fromFeed0(r,city,ref); j._mission=MISSION_ROLES.has(j.role)?5:(j.src==="nycgov"||j.src==="usajobs"||MISSION_ORG.test(j.company))?4.5:3; return j; }
+function fromFeed(r,city,ref){ const j=fromFeed0(r,city,ref); j._mission=j.org!=="company"?5:MISSION_ROLES.has(j.role)?4:3; return j; }
 function fromFeed0(r,city,ref){
   const title=String(r.t||"").replace(/\s+/g," ").trim(), loc=r.l||"", dept=r.d||"", pp=parsePay(r.p||"");
-  const n=COUNTS[r.c]||0, dref=r.o||r.f||"";
+  const n=COUNTS[r.c]||0, dref=r.o||r.f||"", org=orgOf(r.c,r.s,r.w);
   return {id:r.i,src:r.s,company:r.c,mono:monoOf(r.c),title,loc,dept,pay:pp.text,_pay:pp.top,_payLo:pp.lo,equity:/equity/i.test(r.p||""),url:r.u,
     posted:r.o||"",seen:r.f||"",isNew:!!dref&&(ref-new Date(dref+"T00:00:00Z"))<7.5*864e5,commitment:r.k||"",
     fulltime:!/part[- ]?time|contract|contractor|temporary|\btemp\b|seasonal|freelance|per diem|intern|internship|co-?op\b|fellowship|apprentice/i.test(title+" "+(r.k||"")),
     setup:r.r||/\bremote\b/i.test(loc)?"Remote":/\bhybrid\b/i.test(loc+" "+title)?"Hybrid":"",
-    cat:n>=300?"large":n>=50?"growing":"small",openRoles:n,role:roleOf(title,dept),level:levelOf(title),area:areaOf(loc,city),kind:"posting"};
+    cat:n>=300?"large":n>=50?"growing":"small",openRoles:n,org,web:r.w||"",role:roleOf(title,dept,org),level:levelOf(title),area:areaOf(loc,city),kind:"posting"};
 }
 
 /* ---------- reading a resume, all in this browser ---------- */
@@ -657,6 +678,7 @@ function visibleJob(j,p,ignoreArea){
   if(F.saved&&!(p.saved||[]).includes(jkey(j))) return false;
   if(F.newOnly&&!j.isNew) return false;
   if(F.cats&&!F.cats.has(j.cat)) return false;
+  if(F.orgs&&!F.orgs.has(j.org)) return false;
   if(F.roles&&!F.roles.has(j.role)) return false;
   if(F.levels&&!F.levels.has(j.level)) return false;
   if(F.payMin&&!(j._pay>=F.payMin)) return false;
@@ -712,11 +734,11 @@ function renderTop(p,city){
   $("#aib").onclick=openClaude;
   $("#refresh").onclick=()=>loadFeed(city,true);
 }
-function resetFilters(p){ UI.F={q:"",payMin:(p&&p.minPay)||0,setup:"any",cats:null,roles:p&&p.roles&&p.roles.length?new Set(p.roles):null,levels:null,area:null,sort:"match",saved:false,newOnly:false}; UI.limit=60; }
+function resetFilters(p){ UI.F={q:"",payMin:(p&&p.minPay)||0,setup:"any",cats:null,roles:p&&p.roles&&p.roles.length?new Set(p.roles):null,levels:null,orgs:null,area:null,sort:"match",saved:false,newOnly:false}; UI.limit=60; }
 let openPop=null;
 function renderFilters(p,city){
   const F=UI.F, jobs=prepJobs(p,city);
-  const rc={}; jobs.forEach(j=>rc[j.role]=(rc[j.role]||0)+1);
+  const rc={}, oc={}; jobs.forEach(j=>{ rc[j.role]=(rc[j.role]||0)+1; oc[j.org]=(oc[j.org]||0)+1; });
   const rolesIn=Object.keys(ROLES).filter(r=>rc[r]), catsIn=Object.keys(CATS), lv=[0,1,2,3,4,5];
   const setL={any:"Work setup",remote:"Remote",hybrid:"Hybrid",flex:"Remote or hybrid"};
   $("#fbar").innerHTML=`
@@ -728,7 +750,9 @@ function renderFilters(p,city){
       ${openPop==="role"?`<div class="pop" style="width:340px"><div class="chips">${rolesIn.map(r=>`<button class="chip" data-role="${r}" aria-pressed="${!F.roles||F.roles.has(r)}">${ROLES[r]} <span class="note">${rc[r].toLocaleString()}</span></button>`).join("")}</div><p class="note">Sorted from the job title. <button class="mini" id="allroles">Show all roles</button></p></div>`:""}</div>
     <div style="position:relative"><button class="fbtn ${F.levels?"on":""}" data-pop="level" aria-expanded="${openPop==="level"}">Level ▾</button>
       ${openPop==="level"?`<div class="pop"><div class="chips">${lv.map(l=>`<button class="chip" data-lv="${l}" aria-pressed="${!F.levels||F.levels.has(l)}">${LEVELS[l]}</button>`).join("")}</div><p class="note">Read from the job title.</p></div>`:""}</div>
-    <div style="position:relative"><button class="fbtn ${F.cats?"on":""}" data-pop="type" aria-expanded="${openPop==="type"}">Company size ▾</button>
+    <div style="position:relative"><button class="fbtn ${F.orgs?"on":""}" data-pop="org" aria-expanded="${openPop==="org"}">Employer${F.orgs?` (${F.orgs.size})`:""} ▾</button>
+      ${openPop==="org"?`<div class="pop" style="width:320px"><div class="chips">${Object.keys(ORGS).map(o=>`<button class="chip" data-org="${o}" aria-pressed="${!F.orgs||F.orgs.has(o)}">${ORGS[o]} <span class="note">${(oc[o]||0).toLocaleString()}</span></button>`).join("")}</div><p class="note">Government means city and federal postings. Nonprofit and school are judged from the employer's website ending (.org, .edu) when the posting has one, otherwise from words in the name like foundation, museum or school, so a few will be wrong.</p></div>`:""}</div>
+    <div style="position:relative"><button class="fbtn ${F.cats?"on":""}" data-pop="type" aria-expanded="${openPop==="type"}">Size ▾</button>
       ${openPop==="type"?`<div class="pop"><div class="chips">${catsIn.map(c=>`<button class="chip" data-cat="${c}" aria-pressed="${!F.cats||F.cats.has(c)}" style="--c:${cvar(c)}"><span class="sw"></span>${CATS[c]}</button>`).join("")}</div><p class="note">Judged by how many jobs the company has open: ${Object.values(CAT_NOTE).join("; ")}.</p></div>`:""}</div>
     <button class="fbtn ${F.newOnly?"on":""}" id="newonly">New this week</button>
     ${F.area?`<button class="fbtn on" id="clrarea2">${esc(F.area)} ✕</button>`:""}
@@ -742,7 +766,7 @@ function renderFilters(p,city){
   const multi=(attr,field,all,conv)=>$$(`[data-${attr}]`).forEach(b=>b.onclick=()=>{ const k=conv(b.dataset[attr]); F[field]=F[field]||new Set(all);
     if(F[field].size===all.length) F[field]=new Set([k]); else if(F[field].has(k)) F[field].delete(k); else F[field].add(k);
     if(!F[field].size||F[field].size===all.length) F[field]=null; renderFilters(p,city); re(); });
-  multi("cat","cats",catsIn,x=>x); multi("role","roles",rolesIn,x=>x); multi("lv","levels",lv,x=>+x);
+  multi("cat","cats",catsIn,x=>x); multi("org","orgs",Object.keys(ORGS),x=>x); multi("role","roles",rolesIn,x=>x); multi("lv","levels",lv,x=>+x);
   const ar=$("#allroles"); if(ar) ar.onclick=()=>{ F.roles=null; renderFilters(p,city); re(); };
   $("#newonly").onclick=()=>{ F.newOnly=!F.newOnly; renderFilters(p,city); re(); };
   const ca=$("#clrarea2"); if(ca) ca.onclick=()=>{ F.area=null; renderFilters(p,city); re(); };
@@ -762,7 +786,7 @@ function cardHTML(j,p,small){
       <div class="price ${j.pay?"":"muted"}">${esc(priceText(j))}</div>
       <div class="facts">${factsHTML(j)}</div>
       <div class="ltitle">${esc(j.title)}</div>
-      <div class="lsub">${esc(placeText(j))} · ${esc(CATS[j.cat])}</div>
+      <div class="lsub">${esc(placeText(j))} · ${esc(j.org==="company"?CATS[j.cat]:ORGS[j.org])}</div>
       ${small?"":`<div class="ltags"><span class="tg">${esc(ROLES[j.role])}</span>${!j.fulltime?`<span class="tg">Not full-time</span>`:""}${j.equity?`<span class="tg">Equity</span>`:""}<span class="tg">${j.posted?"Posted "+esc(fmtDay(j.posted)):"First seen "+esc(fmtDay(j.seen))}</span></div>`}
     </div></article>`;
 }
@@ -898,7 +922,7 @@ function reasons(j,p){
   if(j.pay){ if(p.minPay&&j._pay&&j._pay<p.minPay) watch.push(`The top of the listed range is below your $${p.minPay}K minimum.`); else why.push(`Pay is listed: ${j.pay}.`); } else watch.push("Pay isn't listed.");
   if(j.setup) why.push(`Listed as ${j.setup.toLowerCase()}.`);
   if(j.equity) why.push("The posting mentions equity.");
-  if((p.priorities||[]).includes("mission")&&j._mission>=4.5) why.push(j.src==="nycgov"||j.src==="usajobs"?"Public-service job.":`${ROLES[j.role]} work, or a mission-driven employer.`);
+  if((p.priorities||[]).includes("mission")&&j._mission>=4) why.push(j.org!=="company"?`${ORGS[j.org]} employer.`:`${ROLES[j.role]} work.`);
   if(!j.fulltime) watch.push("Looks part-time, contract, temporary or an internship.");
   if(j._dist!=null) (j._dist<=2?why:watch).push(`Roughly ${j._dist.toFixed(1)} mi from home, using the neighborhood in the posting.`);
   return {why,watch};
@@ -916,7 +940,7 @@ function renderDetail(p,city){
       <div>
         <div class="price ${j.pay?"":"muted"}">${esc(priceText(j))}</div>
         <h2 style="margin-top:4px">${esc(j.title)}</h2>
-        <div class="lsub" style="font-size:14px">${esc(j.company)} · ${esc(CATS[j.cat])} (${j.openRoles?j.openRoles.toLocaleString()+" open roles in the feed":"size unknown"})</div>
+        <div class="lsub" style="font-size:14px">${esc(j.company)} · ${esc(ORGS[j.org])}${j.org==="company"?"":` <span class="est">(${j.src==="nycgov"||j.src==="usajobs"?"government posting":j.web?"from its website, "+esc(j.web):"guessed from the name"})</span>`} · ${esc(CATS[j.cat])} (${j.openRoles?j.openRoles.toLocaleString()+" open roles in the feed":"size unknown"})</div>
         <div class="ftable">
           <div><small>Setup</small><b>${esc(j.setup||"Not stated")}</b></div>
           <div><small>Level</small><b>${esc(LEVELS[j.level])}</b><div class="est">from the title</div></div>
