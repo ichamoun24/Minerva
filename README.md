@@ -9,6 +9,18 @@ It runs entirely on GitHub's free tools:
 
 No credit card, no API keys, nothing to install on your computer.
 
+## The website
+
+`site/index.html` is the Minerva app. It loads the feed for one city at a time (`site/data/{city}.json`) and does everything else in the visitor's browser:
+
+- reads a resume (PDF, Word or text) without uploading it, guesses years of experience and likely role types
+- scores every job against experience level, chosen role types, resume words and ranked priorities
+- shows the full job description, fetched straight from the company's Greenhouse, Lever or Ashby board
+- tracks applications and interviews, with Google/Outlook calendar links
+- interview prep, mock interviews and reading recruiter emails use Claude, through an Anthropic API key the visitor saves in their own browser (fine for testing; a public launch should route these through a server)
+
+`site/feed.html` is the plain feed browser.
+
 ## How it finds "every" job
 
 These platforms don't publish one master list. Each company has its own public board. So the collector:
