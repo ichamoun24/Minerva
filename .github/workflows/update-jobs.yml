@@ -1,0 +1,79 @@
+name: Update jobs
+
+# Runs every 6 hours (and whenever you press "Run workflow" on the Actions tab).
+# Free for public repositories.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["data/**", "README.md"]
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      discover:
+        description: "Also search for new company job boards (takes longer)"
+        type: boolean
+        default: true
+      board_limit:
+        description: "Only read this many boards (0 = all). Use 300 for a quick first test."
+        type: string
+        default: "0"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update-jobs
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Find company job boards
+        run: |
+          if [ ! -f data/boards.json ] || [ "${{ inputs.discover }}" = "true" ] || [ "$(date -u +%u%H)" = "100" ]; then
+            node scripts/discover.mjs
+          else
+            echo "Skipping discovery this run (it runs weekly on Mondays)."
+          fi
+
+      - name: Read every job
+        env:
+          PREV_URL: ${{ steps.pages.outputs.base_url }}
+          BOARD_LIMIT: ${{ inputs.board_limit || '0' }}
+          CONCURRENCY: "16"
+        run: node scripts/fetch.mjs
+
+      - name: Save the board list
+        run: |
+          git config user.name "jobs-bot"
+          git config user.email "jobs-bot@users.noreply.github.com"
+          git add data/boards.json
+          git diff --cached --quiet || (git commit -m "Update job board list [skip ci]" && git push) || true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

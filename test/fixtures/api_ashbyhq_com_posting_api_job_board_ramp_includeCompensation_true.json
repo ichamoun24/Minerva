@@ -1,0 +1,2 @@
+{"apiVersion":"1","jobs":[{"id":"r1","title":"Account Executive","location":"New York, NY","secondaryLocations":[{"location":"Miami, FL"}],"department":"Sales","team":"SMB","isRemote":false,"isListed":true,"publishedAt":"2026-11-09T00:00:00Z","employmentType":"FullTime","jobUrl":"https://jobs.ashbyhq.com/ramp/r1","compensation":{"compensationTierSummary":"$90K – $120K • Offers Equity"}},
+{"id":"r2","title":"Hidden role","location":"New York, NY","isListed":false,"jobUrl":"https://jobs.ashbyhq.com/ramp/r2"}]}

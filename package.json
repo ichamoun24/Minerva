@@ -1,0 +1,12 @@
+{
+  "name": "minerva-job-feed",
+  "private": true,
+  "type": "module",
+  "description": "Collects public job postings from Greenhouse, Lever and Ashby company job boards and publishes them as static JSON.",
+  "scripts": {
+    "discover": "node scripts/discover.mjs",
+    "fetch": "node scripts/fetch.mjs",
+    "test": "node test/run.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
